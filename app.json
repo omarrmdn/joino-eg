@@ -1,22 +1,26 @@
 {
   "expo": {
-    "name": "eventaat",
-    "slug": "eventaat",
+    "name": "Joino",
+    "slug": "joino-2",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "eventaat",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/logo.png",
+    "scheme": "joino",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#000000"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.joino.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FF5B04",
+        "foregroundImage": "./assets/logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -28,21 +32,46 @@
     "plugins": [
       "expo-router",
       [
+        "expo-stallion-plugin",
+        {
+          "projectId": "6973badb398fbe18cdb1f143",
+          "appToken": "spb_BPkh9fjsg3lPONicPVgA_vywy56r3ghXb3_mzhgkLF"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FF5B04",
           "dark": {
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-localization",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d5efb532-fc75-4ea6-9ece-ed1ef187bcd5"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "owner": "omarrmdn"
   }
 }
