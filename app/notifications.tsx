@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
             style={styles.backButton}
           >
             <Ionicons
-              name={language === "ar" ? "chevron-forward" : "chevron-back"}
+              name={language === "ar" || language === "ar-EG" ? "chevron-forward" : "chevron-back"}
               size={28}
               color={Colors.white}
             />
@@ -137,7 +137,7 @@ export default function NotificationsScreen() {
           style={styles.backButton}
         >
           <Ionicons
-            name={language === "ar" ? "chevron-forward" : "chevron-back"}
+            name={language === "ar" || language === "ar-EG" ? "chevron-forward" : "chevron-back"}
             size={28}
             color={Colors.white}
           />

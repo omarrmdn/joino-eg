@@ -1,4 +1,5 @@
 // Database types matching Supabase schema
+import { CurrencyContext, formatEventPrice } from "../utils/currency";
 
 export interface DBUser {
   id: string; // From Clerk or Auth
@@ -11,6 +12,10 @@ export interface DBUser {
   total_revenue: number;
   date_signed_in: string;
   total_spend: number;
+  currency_code?: string | null;
+  country_code?: string | null;
+  currency_auto_detected?: boolean | null;
+  currency_updated_at?: string | null;
 }
 
 export interface DBTag {
@@ -26,6 +31,7 @@ export interface DBEvent {
   organizer_id: string | null;
   max_capacity: number | null;
   price: number;
+  currency_code?: string | null;
   location: string | null;
   is_online: boolean;
   link: string | null;
@@ -77,6 +83,7 @@ export interface DBUserInterest {
 // Derived type for EventCard component (maps database fields to UI needs)
 export interface EventCardData {
   id: string;
+  parentEventId?: string | null;
   title: string;
   organizer: string;
   organizerId: string | null;
@@ -87,6 +94,7 @@ export interface EventCardData {
   gender: string;
   image: string;
   price: string;
+  currencyCode?: string | null;
   attendingAvatars: string[];
   attendingCount: number;
   tags: string[];
@@ -94,6 +102,7 @@ export interface EventCardData {
   latitude: number | null;
   longitude: number | null;
   rawDate: string;
+  rawTime?: string;
   isAttending?: boolean;
   isOnline: boolean;
   link: string | null;
@@ -122,29 +131,15 @@ export function transformEventToCardData(
   },
   currentUserId?: string | null,
   language: string = "en",
+  currencyContext?: CurrencyContext | null,
 ): EventCardData {
-  // Log the raw event data for debugging
-  /* 
-  console.log("Transforming event:", {
-    id: event.id,
-    title: event.title,
-    date: event.date,
-    time: event.time,
-    price: event.price,
-    organizer: event.organizer,
-    organizer_id: event.organizer_id,
-    is_online: event.is_online,
-    link: event.link,
-  });
-  */
-
   // Handle date formatting with fallback
   let dayName = "Invalid Date";
   try {
     if (event.date) {
       const dateObj = new Date(event.date);
       if (!isNaN(dateObj.getTime())) {
-        dayName = dateObj.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+        dayName = dateObj.toLocaleDateString(language.startsWith('ar') ? 'ar-EG' : 'en-US', {
           weekday: "long",
         });
       }
@@ -173,13 +168,11 @@ export function transformEventToCardData(
   // Handle price with proper null/undefined checks
   let priceStr = "Free";
   try {
-    const priceValue = event.price;
-    if (priceValue !== null && priceValue !== undefined) {
-      const numPrice = Number(priceValue);
-      if (!isNaN(numPrice)) {
-        priceStr = numPrice === 0 ? (language === 'ar' ? "مجاني" : "Free") : (language === 'ar' ? `${numPrice} ج.م` : `$${numPrice.toFixed(2)}`);
-      }
-    }
+    priceStr = formatEventPrice(event.price, {
+      eventCurrencyCode: (event as any).currency_code,
+      language,
+      currencyContext: currencyContext || null,
+    });
   } catch (e) {
     console.error("Error formatting price:", e);
   }
@@ -191,12 +184,7 @@ export function transformEventToCardData(
     .slice(0, 5) || [];
 
   // If no images found but there are attendees, fall back to colors (or mixed)
-  // For now, if we have fewer images than attendees (e.g. some users have no image),
-  // we might want to fill with a placeholder or color.
-  // But to keep it simple and match "user signed image" request, let's just use what we found.
-  // If list is empty but count > 0, we can use a fallback color.
   if (avatarColors.length === 0 && (event.attendees?.length || 0) > 0) {
-    // Add one fallback color if no one has an image but people are attending
     avatarColors.push("#401CB5");
   }
 
@@ -215,18 +203,18 @@ export function transformEventToCardData(
 
   return {
     id: event.id,
+    parentEventId: event.parent_event_id || null,
     title: event.title || "Untitled Event",
     organizer: organizerName,
     organizerId: event.organizer_id || null,
     organizerImage: organizerImageUrl,
-    location: event.location || (language === 'ar' ? "أونلاين" : "Online"),
+    location: event.location || (language.startsWith('ar') ? "أونلاين" : "Online"),
     day: dayName,
     time: formattedTime,
     gender: event.gender || "all",
-    image:
-      event.image_url ||
-      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=250&fit=crop",
+    image: event.image_url || "",
     price: priceStr,
+    currencyCode: (event as any).currency_code || null,
     attendingAvatars: avatarColors,
     attendingCount: event.attendees?.length || 0,
     tags:
@@ -237,9 +225,16 @@ export function transformEventToCardData(
 
           if (language === "en") return tagName;
 
-          const translation = et.tags?.tag_translations?.find(
+          let translation = et.tags?.tag_translations?.find(
             (t) => t.language_code === language
           );
+
+          if (!translation && language === "ar-EG") {
+            translation = et.tags?.tag_translations?.find(
+              (t) => t.language_code === "ar"
+            );
+          }
+
           return translation?.name || tagName;
         })
         .filter((t): t is string => !!t) || [],
@@ -247,6 +242,7 @@ export function transformEventToCardData(
     latitude: event.latitude ?? null,
     longitude: event.longitude ?? null,
     rawDate: event.date || "",
+    rawTime: event.time ? String(event.time) : undefined,
     isAttending,
     isOnline: !!event.is_online,
     link: event.link || null,

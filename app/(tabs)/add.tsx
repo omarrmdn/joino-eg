@@ -2,19 +2,20 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,6 +32,11 @@ import { useAlert } from "../../src/lib/AlertContext";
 import { useLanguage } from "../../src/lib/i18n";
 import { notificationManager } from "../../src/lib/NotificationManager";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
+import {
+  autoDetectAndUpdateUserCurrency,
+  getCountryCodeFromLocale,
+  getCurrencyInfo,
+} from "../../src/utils/currency";
 
 type EventType = "online" | "onsite" | "";
 
@@ -39,6 +45,7 @@ type MapboxPlaceSuggestion = {
   description: string;
   latitude: number | null;
   longitude: number | null;
+  countryCode: string | null;
 };
 
 export default function AddScreen() {
@@ -51,7 +58,7 @@ export default function AddScreen() {
   const isEditMode = !!editId;
   const { tags: allTagsFromDB, tagObjects } = useTags();
   const { t, language } = useLanguage();
-  const { showAlert } = useAlert();
+  const { showAlert, showToast } = useAlert();
   const { trackAction } = useTrackSession();
 
   const [title, setTitle] = useState("");
@@ -84,6 +91,7 @@ export default function AddScreen() {
     MapboxPlaceSuggestion[]
   >([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [isFetchingCurrentLocation, setIsFetchingCurrentLocation] = useState(false);
   const [selectedLocationCoords, setSelectedLocationCoords] = useState<{
     latitude: number;
     longitude: number;
@@ -100,7 +108,60 @@ export default function AddScreen() {
 
   const [image, setImage] = useState<string | null>(null);
 
+  const [userCurrencyCode, setUserCurrencyCode] = useState<string | null>(null);
+  const [userCurrencySymbol, setUserCurrencySymbol] = useState<string>("$");
+  const [userCountryCode, setUserCountryCode] = useState<string | null>(null);
+
+  // Per-field validation errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const hasLocationApiKey = !!process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+
+  useEffect(() => {
+    let active = true;
+    const loadUserCurrency = async () => {
+      if (!user?.id) return;
+      let code: string | null = null;
+      let country: string | null = null;
+      try {
+        const { data } = await supabase
+          .from("users")
+          .select("currency_code, country_code")
+          .eq("id", user.id)
+          .maybeSingle();
+        code = data?.currency_code || null;
+        country = data?.country_code || null;
+      } catch {
+        code = null;
+        country = null;
+      }
+
+      if (!code) {
+        const localeCountry = getCountryCodeFromLocale();
+        const detected = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          localeCountry,
+        );
+        code = detected || code;
+        if (localeCountry) country = localeCountry;
+      }
+
+      if (!active) return;
+      setUserCurrencyCode(code);
+      setUserCountryCode(country);
+      if (code) {
+        const info = await getCurrencyInfo(supabase, code);
+        if (active && info?.symbol) {
+          setUserCurrencySymbol(info.symbol);
+        }
+      }
+    };
+    loadUserCurrency();
+    return () => {
+      active = false;
+    };
+  }, [user?.id, supabase]);
 
   // Filter tags based on input
   const handleTagInputChange = useCallback(
@@ -161,17 +222,19 @@ export default function AddScreen() {
         console.warn(
           "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN is not set. Location search is disabled.",
         );
-        setLocationSuggestions([]);
-        setShowLocationSuggestions(false);
-        return;
-      }
+          return;
+        }
 
       try {
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-            query,
-          )}.json?access_token=${apiKey}&autocomplete=true&limit=5`,
-        );
+        let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+          query,
+        )}.json?access_token=${apiKey}&autocomplete=true&limit=5`;
+        
+        if (userCountryCode) {
+            url += `&country=${userCountryCode}`;
+        }
+        
+        const response = await fetch(url);
         const json = await response.json();
 
         if (!json.features || !Array.isArray(json.features)) {
@@ -185,6 +248,10 @@ export default function AddScreen() {
           .map((f: any) => ({
             id: f.id,
             description: f.place_name,
+            countryCode:
+              f?.context?.find?.((c: any) => String(c?.id || "").startsWith("country"))?.short_code ||
+              f?.properties?.short_code ||
+              null,
             latitude:
               Array.isArray(f.center) && typeof f.center[1] === "number"
                 ? f.center[1]
@@ -203,7 +270,7 @@ export default function AddScreen() {
         setShowLocationSuggestions(false);
       }
     },
-    [],
+    [userCountryCode],
   );
 
   const handleSelectLocationSuggestion = useCallback(
@@ -222,8 +289,23 @@ export default function AddScreen() {
 
       setLocationSuggestions([]);
       setShowLocationSuggestions(false);
+
+      if (user?.id && suggestion.countryCode) {
+        const detected = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          suggestion.countryCode,
+        );
+        if (detected) {
+          setUserCurrencyCode(detected);
+          const info = await getCurrencyInfo(supabase, detected);
+          if (info?.symbol) {
+            setUserCurrencySymbol(info.symbol);
+          }
+        }
+      }
     },
-    [],
+    [supabase, user?.id],
   );
 
   const handleLocationChange = (text: string) => {
@@ -235,6 +317,77 @@ export default function AddScreen() {
     setSelectedLocationCoords(null);
     fetchLocationSuggestions(text);
   };
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    if (isFetchingCurrentLocation) return;
+
+    trackAction("location_use_current_for_event");
+    setIsFetchingCurrentLocation(true);
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        showAlert({
+          title: t("location_settings_title") || "Permission Required",
+          message: t("location_settings_msg"),
+          type: "warning",
+        });
+        return;
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      });
+
+      const parts = [
+        address?.name,
+        address?.city,
+        address?.region,
+        address?.country,
+      ].filter(Boolean);
+
+      const formattedLocation =
+        parts.join(", ") ||
+        `${current.coords.latitude.toFixed(4)}, ${current.coords.longitude.toFixed(4)}`;
+
+      setLocation(formattedLocation);
+      setSelectedLocationCoords({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      });
+      setLocationSuggestions([]);
+      setShowLocationSuggestions(false);
+
+      if (user?.id) {
+        const detected = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          address?.isoCountryCode || null,
+        );
+        if (detected) {
+          setUserCurrencyCode(detected);
+          const info = await getCurrencyInfo(supabase, detected);
+          if (info?.symbol) {
+            setUserCurrencySymbol(info.symbol);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Error getting current location:", error);
+      showAlert({
+        title: t("error_title"),
+        message: t("location_error_msg"),
+        type: "error",
+      });
+    } finally {
+      setIsFetchingCurrentLocation(false);
+    }
+  }, [isFetchingCurrentLocation, showAlert, t, trackAction, supabase, user?.id]);
 
   // Load event details when editing
   useEffect(() => {
@@ -558,52 +711,65 @@ export default function AddScreen() {
     };
 
 
+    // Validate all required fields and return errors object
+    const validateForm = (): Record<string, string> => {
+      const errors: Record<string, string> = {};
+
+      if (!image) errors.image = t("error_required_fields");
+      if (!title.trim()) errors.title = t("error_required_fields");
+      if (!eventType) errors.eventType = t("error_required_fields");
+
+      if (eventType === "onsite" && !location.trim()) {
+        errors.location = t("error_location_required_onsite");
+      }
+      if (eventType === "onsite" && location.trim() && hasLocationApiKey && !selectedLocationCoords) {
+        errors.location = t("error_location_google_required");
+      }
+      if (eventType === "online" && !eventLink.trim()) {
+        errors.link = t("error_link_required_online");
+      }
+      if (eventType === "online" && eventLink.trim()) {
+        const urlPattern = /^https?:\/\/[^\s]+$/i;
+        if (!urlPattern.test(eventLink.trim())) {
+          errors.link = t("error_invalid_online_link");
+        }
+      }
+
+      if (!startDate) errors.startDate = t("error_required_fields");
+      if (!eventTime) errors.eventTime = t("error_required_fields");
+      if (!endTime) errors.endTime = t("error_required_fields");
+
+      if (!maxCapacity.trim()) {
+        errors.capacity = t("error_required_fields");
+      } else if (maxCapacity.length > 4) {
+        errors.capacity = t("error_capacity_price_invalid");
+      }
+
+      if (!cost.trim()) {
+        errors.cost = t("error_required_fields");
+      } else if (cost.replace(/\D/g, "").length > 6) {
+        errors.cost = t("error_capacity_price_invalid");
+      }
+
+      if (selectedTags.length === 0) {
+        errors.tags = t("error_required_fields");
+      }
+
+      return errors;
+    };
+
     const handlePublish = async () => {
-    if (!title.trim() || !eventType || !startDate || !eventTime) {
+    // Validate all fields
+    const errors = validateForm();
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
       showAlert({
         title: t("error_past_date_title"),
         message: t("error_required_fields"),
         type: 'warning',
       });
       return;
-    }
-    if (eventType === "onsite") {
-      if (!location.trim()) {
-        showAlert({
-          title: t("error_past_date_title"),
-          message: t("error_location_required_onsite"),
-          type: 'warning',
-        });
-        return;
-      }
-      if (hasLocationApiKey && !selectedLocationCoords) {
-        showAlert({
-          title: t("error_past_date_title"),
-          message: t("error_location_google_required"),
-          type: 'warning',
-        });
-        return;
-      }
-    }
-    if (eventType === "online" && !eventLink.trim()) {
-      showAlert({
-        title: t("error_past_date_title"),
-        message: t("error_link_required_online"),
-        type: 'warning',
-      });
-      return;
-    }
-    if (eventType === "online") {
-      const trimmedLink = eventLink.trim();
-      const urlPattern = /^https?:\/\/[^\s]+$/i;
-      if (!urlPattern.test(trimmedLink)) {
-        showAlert({
-          title: t("error_past_date_title"),
-          message: t("error_invalid_online_link"),
-          type: 'warning',
-        });
-        return;
-      }
     }
 
     if (!user) {
@@ -615,18 +781,6 @@ export default function AddScreen() {
       return;
     }
 
-    if (
-      (maxCapacity && maxCapacity.length > 4) ||
-      (cost && cost.replace(/\D/g, "").length > 6)
-    ) {
-      showAlert({
-        title: t("error_past_date_title"),
-        message: t("error_capacity_price_invalid"),
-        type: 'warning',
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -634,6 +788,23 @@ export default function AddScreen() {
       const uploadedImageUrl = await uploadImageIfNeeded();
 
       // Build payload used for insert or update
+      let resolvedCurrencyCode = userCurrencyCode;
+      if (!resolvedCurrencyCode && user?.id) {
+        const detected = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          getCountryCodeFromLocale(),
+        );
+        if (detected) {
+          resolvedCurrencyCode = detected;
+          setUserCurrencyCode(detected);
+          const info = await getCurrencyInfo(supabase, detected);
+          if (info?.symbol) {
+            setUserCurrencySymbol(info.symbol);
+          }
+        }
+      }
+
       const eventPayload: any = {
         title,
         organizer_id: user.id,
@@ -643,13 +814,11 @@ export default function AddScreen() {
         is_online: eventType === "online",
         link: eventType === "online" ? eventLink : null,
         gender: gender === "Males" ? "male" : gender === "Females" ? "female" : "all",
-        date: startDate.toISOString().split("T")[0],
-        time: eventTime.toTimeString().split(" ")[0],
+        date: startDate!.toISOString().split("T")[0],
+        time: eventTime!.toTimeString().split(" ")[0],
         end_time: endTime ? endTime.toTimeString().split(" ")[0] : null,
         end_date: endDate ? endDate.toISOString().split("T")[0] : null,
-        image_url:
-          uploadedImageUrl ||
-          "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=400&h=250&auto=format&fit=crop",
+        image_url: uploadedImageUrl,
         // Recurrence fields (simple weekly series)
         is_recurring: isRecurringWeekly && !!startDate,
         recurrence_pattern: isRecurringWeekly && startDate ? "weekly" : null,
@@ -662,10 +831,14 @@ export default function AddScreen() {
         status: "active",
       };
 
+      if (resolvedCurrencyCode) {
+        eventPayload.currency_code = resolvedCurrencyCode;
+      }
+
       // Add description (and simple recurrence note) if description column exists in DB
       let finalDescription = description;
       if (isRecurringWeekly && startDate) {
-        const weekdayName = startDate.toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", {
+        const weekdayName = startDate.toLocaleDateString(language.startsWith("ar") ? "ar-EG" : "en-US", {
           weekday: "long",
         });
         const note = `\n\n${t("create_event_repeat_note_prefix")} ${weekdayName}s.`;
@@ -817,14 +990,13 @@ export default function AddScreen() {
       setSavedEventId(eventId);
       trackAction(isEditMode ? "edit_event_success" : "create_event_success", { eventId });
       resetForm();
-      // Promotion disabled - show success instead
-      showAlert({
-        title: t("success_title") || "Success",
-        message: isEditMode
-          ? t("event_updated_success") || "Event updated!"
-          : t("event_posted_success") || "Event posted!",
-        type: "success",
-      });
+        // Promotion disabled - show success instead
+        showToast({
+          message: isEditMode
+            ? t("event_updated_success")
+            : t("event_posted_success"),
+          type: "success",
+        });
       notificationManager.setHasUnreadEvents(true);
       router.replace("/(tabs)");
     } catch (error: any) {
@@ -849,7 +1021,7 @@ export default function AddScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons
-            name={language === "ar" ? "chevron-forward" : "chevron-back"}
+            name={language.startsWith("ar") ? "chevron-forward" : "chevron-back"}
             size={28}
             color={Colors.white}
           />
@@ -870,7 +1042,7 @@ export default function AddScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
-            style={styles.imagePlaceholder}
+            style={[styles.imagePlaceholder, fieldErrors.image && styles.inputError]}
             activeOpacity={0.8}
             onPress={handlePickImage}
           >
@@ -882,24 +1054,27 @@ export default function AddScreen() {
               />
             ) : (
               <>
-                <Ionicons name="add" size={50} color={Colors.primary} />
-                <Text style={styles.imagePlaceholderText}>
+                <Ionicons name="add" size={50} color={fieldErrors.image ? Colors.error : Colors.primary} />
+                <Text style={[styles.imagePlaceholderText, fieldErrors.image && { color: Colors.error }]}>
                   {t("create_event_banner_hint")}
                 </Text>
               </>
             )}
           </TouchableOpacity>
+          {fieldErrors.image && <Text style={styles.fieldErrorText}>{fieldErrors.image}</Text>}
+          <Text style={styles.imageSizeHint}>{t("create_event_image_size_hint")}</Text>
 
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, fieldErrors.title && styles.inputError]}>
               <TextInput
                 style={styles.input}
                 placeholder={t("create_event_title_placeholder")}
-                placeholderTextColor={Colors.gray}
+                placeholderTextColor={fieldErrors.title ? Colors.error : Colors.gray}
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={(text) => { setTitle(text); if (fieldErrors.title) setFieldErrors(prev => { const n = {...prev}; delete n.title; return n; }); }}
               />
             </View>
+            {fieldErrors.title && <Text style={styles.fieldErrorText}>{fieldErrors.title}</Text>}
 
             <View style={[styles.inputContainer, styles.textAreaContainer]}>
               <TextInput
@@ -915,15 +1090,15 @@ export default function AddScreen() {
             </View>
 
             <Text style={styles.label}>{t("create_event_type_label")}</Text>
-            <View style={styles.typeSelector}>
+            <View style={[styles.typeSelector, fieldErrors.eventType && { borderWidth: 1, borderColor: Colors.error, borderRadius: 12, padding: 4 }]}>
               <TouchableOpacity
-                style={[styles.typeButton, isOnline && styles.typeButtonActive]}
-                onPress={() => setEventType("online")}
+                style={[styles.typeButton, isOnline && styles.typeButtonActive, fieldErrors.eventType && !isOnline && styles.typeButtonError]}
+                onPress={() => { setEventType("online"); if (fieldErrors.eventType) setFieldErrors(prev => { const n = {...prev}; delete n.eventType; return n; }); }}
               >
                 <Ionicons
                   name="globe-outline"
                   size={20}
-                  color={isOnline ? Colors.white : Colors.gray}
+                  color={isOnline ? Colors.white : fieldErrors.eventType ? Colors.error : Colors.gray}
                 />
                 <Text
                   style={[
@@ -935,13 +1110,13 @@ export default function AddScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.typeButton, isOnsite && styles.typeButtonActive]}
-                onPress={() => setEventType("onsite")}
+                style={[styles.typeButton, isOnsite && styles.typeButtonActive, fieldErrors.eventType && !isOnsite && styles.typeButtonError]}
+                onPress={() => { setEventType("onsite"); if (fieldErrors.eventType) setFieldErrors(prev => { const n = {...prev}; delete n.eventType; return n; }); }}
               >
                 <Ionicons
                   name="location-outline"
                   size={20}
-                  color={isOnsite ? Colors.white : Colors.gray}
+                  color={isOnsite ? Colors.white : fieldErrors.eventType ? Colors.error : Colors.gray}
                 />
                 <Text
                   style={[
@@ -953,27 +1128,50 @@ export default function AddScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            {fieldErrors.eventType && <Text style={styles.fieldErrorText}>{fieldErrors.eventType}</Text>}
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder={
-                  isOnline
-                    ? t("create_event_location_online")
-                    : t("create_event_location_onsite")
-                }
-                placeholderTextColor={Colors.gray}
-                value={isOnline ? eventLink : location}
-                onChangeText={handleLocationChange}
-                editable={!!eventType}
-              />
+            <View style={[styles.inputContainer, (fieldErrors.location || fieldErrors.link) && styles.inputError]}>
+              <View style={styles.locationInputRow}>
+                <TextInput
+                  style={[styles.input, styles.locationInput]}
+                  placeholder={
+                    isOnline
+                      ? t("create_event_location_online")
+                      : t("create_event_location_onsite")
+                  }
+                  placeholderTextColor={(fieldErrors.location || fieldErrors.link) ? Colors.error : Colors.gray}
+                  value={isOnline ? eventLink : location}
+                  onChangeText={(text) => {
+                    handleLocationChange(text);
+                    if (fieldErrors.location || fieldErrors.link) setFieldErrors(prev => { const n = {...prev}; delete n.location; delete n.link; return n; });
+                  }}
+                  editable={!!eventType}
+                />
+                {isOnsite && (
+                  <TouchableOpacity
+                    style={styles.locationIndicatorButton}
+                    onPress={handleUseCurrentLocation}
+                    disabled={isFetchingCurrentLocation}
+                  >
+                    {isFetchingCurrentLocation ? (
+                      <ActivityIndicator size="small" color={Colors.white} />
+                    ) : (
+                      <Ionicons
+                        name="location-outline"
+                        size={18}
+                        color={Colors.white}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
+            {(fieldErrors.location || fieldErrors.link) && <Text style={styles.fieldErrorText}>{fieldErrors.location || fieldErrors.link}</Text>}
 
             {/* Mapbox search suggestions for onsite events */}
             {isOnsite && showLocationSuggestions && (
               <ScrollView
                 style={styles.locationSuggestionsContainer}
-                scrollEnabled={locationSuggestions.length > 5}
                 nestedScrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
               >
@@ -994,17 +1192,17 @@ export default function AddScreen() {
             <Text style={styles.label}>{t("create_event_schedule_label")}</Text>
             <View style={styles.row}>
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }]}
-                onPress={() => setDatePickerVisibility(true)}
+                style={[styles.inputContainer, { flex: 1 }, fieldErrors.startDate && styles.inputError]}
+                onPress={() => { setDatePickerVisibility(true); if (fieldErrors.startDate) setFieldErrors(prev => { const n = {...prev}; delete n.startDate; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
                   <Ionicons
                     name="calendar-outline"
                     size={20}
-                    color={Colors.primary}
+                    color={fieldErrors.startDate ? Colors.error : Colors.primary}
                   />
                   <Text
-                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }]}
+                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }, fieldErrors.startDate && { color: Colors.error }]}
                   >
                     {startDate
                       ? startDate.toLocaleDateString()
@@ -1014,17 +1212,17 @@ export default function AddScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }]}
-                onPress={() => setTimePickerVisibility(true)}
+                style={[styles.inputContainer, { flex: 1 }, fieldErrors.eventTime && styles.inputError]}
+                onPress={() => { setTimePickerVisibility(true); if (fieldErrors.eventTime) setFieldErrors(prev => { const n = {...prev}; delete n.eventTime; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
                   <Ionicons
                     name="time-outline"
                     size={20}
-                    color={Colors.primary}
+                    color={fieldErrors.eventTime ? Colors.error : Colors.primary}
                   />
                   <Text
-                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }]}
+                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }, fieldErrors.eventTime && { color: Colors.error }]}
                   >
                     {eventTime
                       ? eventTime.toLocaleTimeString([], {
@@ -1036,6 +1234,7 @@ export default function AddScreen() {
                 </View>
               </TouchableOpacity>
             </View>
+            {(fieldErrors.startDate || fieldErrors.eventTime) && <Text style={styles.fieldErrorText}>{fieldErrors.startDate || fieldErrors.eventTime}</Text>}
 
             <Text style={styles.label}>{t("create_event_end_label")}</Text>
             <View style={styles.row}>
@@ -1060,24 +1259,24 @@ export default function AddScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }]}
-                onPress={() => setEndTimePickerVisibility(true)}
+                style={[styles.inputContainer, { flex: 1 }, fieldErrors.endTime && styles.inputError]}
+                onPress={() => { setEndTimePickerVisibility(true); if (fieldErrors.endTime) setFieldErrors(prev => { const n = {...prev}; delete n.endTime; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
                   <Ionicons
                     name="time-outline"
                     size={20}
-                    color={Colors.primary}
+                    color={fieldErrors.endTime ? Colors.error : Colors.primary}
                   />
                   <Text
-                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }]}
+                    style={[styles.input, { marginLeft: 10, lineHeight: 55 }, fieldErrors.endTime && { color: Colors.error }]}
                   >
                     {endTime
                       ? endTime.toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : t("create_event_end_time")}
+                      : t("create_event_end_time") + " *"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1106,14 +1305,14 @@ export default function AddScreen() {
               <Text style={styles.recurringHelper}>
                 {isRecurringWeekly
                   ? `${t("create_event_repeat_helper_prefix")} ${startDate.toLocaleDateString(
-                      language === "ar" ? "ar-EG" : "en-US",
+                      language.startsWith("ar") ? "ar-EG" : "en-US",
                       { weekday: "long" },
-                    )}s${
+                    )}${language === 'en' ? 's' : ''}${
                       endDate
                         ? ` ${t("create_event_repeat_helper_until")} ${endDate.toLocaleDateString()}`
                         : ` ${t("create_event_repeat_helper_no_end")}`
                     }.`
-                  : startDate.toLocaleDateString(language === "ar" ? "ar-EG" : "en-US", {
+                  : startDate.toLocaleDateString(language.startsWith("ar") ? "ar-EG" : "en-US", {
                       weekday: "short",
                       month: "short",
                       day: "numeric",
@@ -1122,29 +1321,37 @@ export default function AddScreen() {
             )}
 
             <View style={styles.row}>
-              <View style={[styles.inputContainer, { flex: 1 }]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t("create_event_capacity")}
-                  placeholderTextColor={Colors.gray}
-                  value={maxCapacity}
-                  onChangeText={(text) =>
-                    setMaxCapacity(text.replace(/[^0-9]/g, ""))
-                  }
-                  keyboardType="number-pad"
-                />
+              <View style={[{ flex: 1 }]}>
+                <View style={[styles.inputContainer, fieldErrors.capacity && styles.inputError]}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t("create_event_capacity") + " *"}
+                    placeholderTextColor={fieldErrors.capacity ? Colors.error : Colors.gray}
+                    value={maxCapacity}
+                    onChangeText={(text) => {
+                      setMaxCapacity(text.replace(/[^0-9]/g, ""));
+                      if (fieldErrors.capacity) setFieldErrors(prev => { const n = {...prev}; delete n.capacity; return n; });
+                    }}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                {fieldErrors.capacity && <Text style={styles.fieldErrorText}>{fieldErrors.capacity}</Text>}
               </View>
-              <View style={[styles.inputContainer, { flex: 1 }]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t("create_event_cost")}
-                  placeholderTextColor={Colors.gray}
-                  value={cost}
-                  onChangeText={(text) =>
-                    setCost(text.replace(/[^0-9.]/g, ""))
-                  }
-                  keyboardType="decimal-pad"
-                />
+              <View style={[{ flex: 1 }]}>
+                <View style={[styles.inputContainer, fieldErrors.cost && styles.inputError]}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t("create_event_cost") + " *"}
+                    placeholderTextColor={fieldErrors.cost ? Colors.error : Colors.gray}
+                    value={cost}
+                    onChangeText={(text) => {
+                      setCost(text.replace(/[^0-9.]/g, ""));
+                      if (fieldErrors.cost) setFieldErrors(prev => { const n = {...prev}; delete n.cost; return n; });
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                {fieldErrors.cost && <Text style={styles.fieldErrorText}>{fieldErrors.cost}</Text>}
               </View>
             </View>
 
@@ -1181,23 +1388,23 @@ export default function AddScreen() {
             </View>
 
             {/* Tags Input */}
-            <Text style={styles.label}>{t("create_event_tags_label")}</Text>
-            <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t("create_event_tags_label") + " *"}</Text>
+            <View style={[styles.inputContainer, fieldErrors.tags && styles.inputError]}>
               <TextInput
                 style={styles.input}
                 placeholder={t("create_event_tags_placeholder")}
-                placeholderTextColor={Colors.gray}
+                placeholderTextColor={fieldErrors.tags ? Colors.error : Colors.gray}
                 value={tagInput}
                 onChangeText={handleTagInputChange}
                 onSubmitEditing={addCustomTag}
                 returnKeyType="done"
               />
             </View>
+            {fieldErrors.tags && <Text style={styles.fieldErrorText}>{fieldErrors.tags}</Text>}
 
             {showTagSuggestions && (
               <ScrollView
                 style={styles.suggestionsContainer}
-                scrollEnabled={suggestedTags.length > 5}
                 nestedScrollEnabled={true}
               >
                 {suggestedTags.map((tag) => (
@@ -1332,20 +1539,11 @@ export default function AddScreen() {
         <PromotionBottomSheet
           visible={showPromotionSheet}
           onClose={() => setShowPromotionSheet(false)}
+          currencySymbol={userCurrencySymbol}
           onContinue={(price, fillAllSeats) => {
             console.log(`Continuing with price: ${price}, fillAllSeats: ${fillAllSeats}`);
             // Proceed to purchase logic here
             setShowPromotionSheet(false);
-            notificationManager.setHasUnreadEvents(true);
-            if (isEditMode && savedEventId) {
-              router.replace({
-                pathname: "/event-details",
-                params: { id: savedEventId },
-              });
-            } else {
-              resetForm();
-              router.replace("/(tabs)");
-            }
           }}
         />
       )}
@@ -1384,6 +1582,14 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 10,
   },
+  imageSizeHint: {
+    color: Colors.gray,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    textAlign: "center",
+    marginTop: -12,
+    marginBottom: 12,
+  },
   form: { gap: 15 },
   label: {
     color: Colors.white,
@@ -1403,6 +1609,22 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontFamily: Fonts.regular,
+  },
+  locationInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationInput: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  locationIndicatorButton: {
+    backgroundColor: Colors.darkflame,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    justifyContent: "center",
+    alignItems: "center",
   },
   textAreaContainer: { height: 100 },
   textArea: { height: "100%", paddingTop: 15 },
@@ -1496,6 +1718,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
   },
   publishButton: { marginTop: 10 },
+  inputError: {
+    borderColor: Colors.error,
+    borderWidth: 1.5,
+  },
+  typeButtonError: {
+    borderColor: Colors.error,
+  },
+  fieldErrorText: {
+    color: Colors.error,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    marginTop: 2,
+    marginBottom: 2,
+    marginLeft: 4,
+  },
   recurringToggle: {
     width: 32,
     height: 32,

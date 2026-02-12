@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
+import { useTrackSession } from "../src/hooks/useTrackSession";
 import { notificationManager } from "../src/lib/NotificationManager";
 import { useSupabaseClient } from "../src/lib/supabaseConfig";
 import notificationService from "./notificationService";
@@ -11,6 +12,7 @@ import type { Notification, NotificationPreferences } from "./notifications";
 export function useNotifications() {
   const { userId } = useAuth();
   const supabase = useSupabaseClient();
+  const { trackAction } = useTrackSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -94,11 +96,18 @@ export function useNotifications() {
 
         // Update badge
         await notificationService.setBadgeCount(Math.max(0, unreadCount - 1));
+
+        const notification = notifications.find((n) => n.id === notificationId);
+        trackAction("notification_read", {
+          notificationId,
+          notificationType: notification?.type,
+          eventId: notification?.data?.event_id,
+        });
       } catch (error) {
         console.error("Error marking notification as read:", error);
       }
     },
-    [userId, unreadCount, supabase],
+    [userId, unreadCount, supabase, notifications, trackAction],
   );
 
   // Mark all as read
@@ -117,10 +126,11 @@ export function useNotifications() {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
       await notificationService.setBadgeCount(0);
+      trackAction("notification_read", { all: true });
     } catch (error) {
       console.error("Error marking all as read:", error);
     }
-  }, [userId, supabase]);
+  }, [userId, supabase, trackAction]);
 
   // Delete notification
   const deleteNotification = useCallback(
@@ -205,12 +215,12 @@ export function useNotifications() {
     [markAsRead],
   );
 
-  // Subscribe to real-time notifications
+  // Subscribe to real-time notifications (list update only)
   useEffect(() => {
     if (!userId) return;
 
     const channel = supabase
-      .channel("notifications")
+      .channel("notifications_list_update")
       .on(
         "postgres_changes",
         {
@@ -223,61 +233,33 @@ export function useNotifications() {
           const newNotification = payload.new as Notification;
           setNotifications((prev) => [newNotification, ...prev]);
           setUnreadCount((prev) => prev + 1);
-          notificationManager.setHasUnreadNotifications(true);
-
-          // Update badge
-          notificationService.setBadgeCount(unreadCount + 1);
-
-          // Show local notification
-          notificationService.sendLocalNotification(
-            newNotification.title,
-            newNotification.body,
-            newNotification.data,
-          );
         },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const updated = payload.new as Notification;
+          setNotifications((prev) => prev.map(n => n.id === updated.id ? updated : n));
+          // Recalculate unread locally
+          setNotifications(prev => {
+            const unread = prev.filter(n => !n.read).length;
+            setUnreadCount(unread);
+            return prev;
+          });
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, unreadCount, supabase]);
-
-  // Setup push notification listeners
-  useEffect(() => {
-    // Listen for notifications received while app is foregrounded
-    const receivedSubscription =
-      notificationService.addNotificationReceivedListener((notification) => {
-        console.log("Notification received:", notification);
-      });
-
-    // Listen for notification taps
-    const responseSubscription =
-      notificationService.addNotificationResponseReceivedListener(
-        (response) => {
-          const data = response.notification.request.content
-            .data as Notification;
-          if (data) {
-            handleNotificationTap(data);
-          }
-        },
-      );
-
-    // Check if app was opened from a notification
-    notificationService.getLastNotificationResponse().then((response) => {
-      if (response) {
-        const data = response.notification.request.content.data as Notification;
-        if (data) {
-          handleNotificationTap(data);
-        }
-      }
-    });
-
-    return () => {
-      receivedSubscription.remove();
-      responseSubscription.remove();
-    };
-  }, [handleNotificationTap]);
+  }, [userId, supabase]);
 
   // Initial fetch
   useEffect(() => {

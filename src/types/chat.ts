@@ -21,6 +21,7 @@ export type Conversation = {
     unread?: boolean;
     avatar: string | null;
     otherUserId: string;
-    eventId: string;
+    lastEventId: string | null;
+    eventOrganizerId?: string | null;
     messages: ConversationMessage[];
 };

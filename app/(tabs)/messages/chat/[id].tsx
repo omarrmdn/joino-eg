@@ -13,6 +13,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     StatusBar,
@@ -22,7 +23,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ChatScreen() {
   const { user } = useUser();
@@ -30,9 +31,11 @@ export default function ChatScreen() {
   const { messages, loading, sendMessage, markAsRead } = useMessages();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const selectedConversationId = Array.isArray(id) ? id[0] : id;
 
@@ -46,7 +49,7 @@ export default function ChatScreen() {
       const otherUser = isFromMe ? msg.recipient : msg.sender;
       const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
       const eventId = msg.event_id;
-      const convId = `${otherUserId}_${eventId}`;
+      const convId = `${otherUserId}`;
 
       if (!groups[convId]) {
         groups[convId] = {
@@ -58,7 +61,8 @@ export default function ChatScreen() {
             lastTimestamp: msg.created_at,
             avatar: otherUser?.image_url || null,
             otherUserId,
-            eventId,
+            lastEventId: eventId ?? null,
+            eventOrganizerId: msg.event?.organizer_id || null,
             messages: [],
         };
       }
@@ -66,6 +70,9 @@ export default function ChatScreen() {
       // Update last message
       if (msg.created_at > groups[convId].lastTimestamp) {
           groups[convId].lastTimestamp = msg.created_at;
+          groups[convId].role = msg.event?.title || t("chat_general_role");
+          groups[convId].lastEventId = eventId ?? null;
+          groups[convId].eventOrganizerId = msg.event?.organizer_id || null;
       }
 
       groups[convId].messages.push({
@@ -94,6 +101,10 @@ export default function ChatScreen() {
     conversations.find(c => c.id === selectedConversationId), 
     [conversations, selectedConversationId]
   );
+  const isOrganizer = !!(user?.id && selectedConversation?.eventOrganizerId && user.id === selectedConversation.eventOrganizerId);
+  const headerSubtitle = isOrganizer
+    ? t("chat_attendee")
+    : `${t("chat_organizer_of")} ${selectedConversation?.role}`;
 
   // Mark messages as read when they appear in the active chat
   React.useEffect(() => {
@@ -107,6 +118,7 @@ export default function ChatScreen() {
   }, [selectedConversation, user, markAsRead]);
 
   const flatListRef = useRef<FlatList>(null);
+  const isAtBottomRef = useRef(true);
 
   const scrollToBottom = (animated = true) => {
     if (flatListRef.current) {
@@ -124,7 +136,7 @@ export default function ChatScreen() {
         await sendMessage({
             body: inputValue.trim(),
             recipient_id: selectedConversation.otherUserId,
-            event_id: selectedConversation.eventId,
+            event_id: selectedConversation.lastEventId ?? null,
             message_type: 'general',
         });
         setInputValue("");
@@ -142,6 +154,15 @@ export default function ChatScreen() {
 
   const onBackPress = () => router.back();
 
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   if (!selectedConversation) return (
       <View style={[styles.container, styles.center]}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -157,7 +178,7 @@ export default function ChatScreen() {
             onPress={onBackPress}
             style={styles.backButton}
           >
-             <Ionicons name={language === 'ar' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+             <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
           </TouchableOpacity>
           
           <View style={styles.headerProfileContainer}>
@@ -170,7 +191,7 @@ export default function ChatScreen() {
                     {selectedConversation.name}
                 </Text>
                 <Text style={styles.headerProfileRole} numberOfLines={1}>
-                    {t("chat_organizer_of")} {selectedConversation.role}
+                    {headerSubtitle}
                 </Text>
              </View>
           </View>
@@ -179,7 +200,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0} 
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 64 : 0}
       >
 
         <FlatList
@@ -193,11 +214,22 @@ export default function ChatScreen() {
           removeClippedSubviews={Platform.OS === 'android'}
           contentContainerStyle={styles.chatMessages}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => scrollToBottom()}
-          onLayout={() => scrollToBottom(false)}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          onScroll={(event) => {
+            const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+            isAtBottomRef.current =
+              contentOffset.y + layoutMeasurement.height >= contentSize.height - 20;
+          }}
+          scrollEventThrottle={16}
+          onContentSizeChange={() => {
+            if (isKeyboardVisible || isAtBottomRef.current) {
+              scrollToBottom(isKeyboardVisible);
+            }
+          }}
         />
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: 10 + insets.bottom }]}>
           <TouchableOpacity style={styles.inputIconButton}>
             <Ionicons name="add" size={24} color={Colors.primary} />
           </TouchableOpacity>
@@ -299,6 +331,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     maxHeight: 100,
+    minHeight: 40,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -307,6 +340,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     fontSize: 15,
     marginHorizontal: 8,
+    textAlignVertical: "center",
   },
   sendButton: {
     width: 40,

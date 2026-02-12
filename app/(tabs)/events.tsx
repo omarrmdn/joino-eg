@@ -3,12 +3,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DaysSlider } from "../../src/components/DaysSlider";
@@ -19,6 +19,11 @@ import { useLanguage } from "../../src/lib/i18n";
 import { notificationManager } from "../../src/lib/NotificationManager";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
 import { EventCardData, transformEventToCardData } from "../../src/types/database";
+import {
+    autoDetectAndUpdateUserCurrency,
+    buildCurrencyContext,
+    getCountryCodeFromLocale,
+} from "../../src/utils/currency";
 
 export default function EventsScreen() {
   const { user } = useUser();
@@ -72,7 +77,8 @@ export default function EventsScreen() {
 
       if (attendedIds && attendedIds.length > 0) {
         const attendedEventIds = attendedIds.map(a => a.event_id);
-        const uniqueAttendedIds = attendedEventIds.filter(id => !allEventsData.find(e => e.id === id));
+        const uniqueAttendedIds = Array.from(new Set(attendedEventIds))
+          .filter(id => !allEventsData.find(e => e.id === id));
 
         if (uniqueAttendedIds.length > 0) {
           const { data: attendedData, error: attendedError } = await supabase
@@ -100,16 +106,58 @@ export default function EventsScreen() {
           allEventsData = [...allEventsData, ...(attendedData || [])];
         }
       }
-      
-      const mapped = allEventsData.map((event: any) => transformEventToCardData(event, user.id));
+
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("currency_code")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      let userCurrencyCode = userRow?.currency_code;
+      if (!userCurrencyCode && user.id) {
+        const detected = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          getCountryCodeFromLocale(),
+        );
+        if (detected) userCurrencyCode = detected;
+      }
+
+      const eventCurrencyCodes = (allEventsData || [])
+        .map((event: any) => event?.currency_code)
+        .filter(Boolean);
+      const currencyContext = await buildCurrencyContext(
+        supabase,
+        userCurrencyCode,
+        eventCurrencyCodes,
+      );
+
+      const mapped = allEventsData.map((event: any) =>
+        transformEventToCardData(event, user.id, language, currencyContext),
+      );
+
+      // De-duplicate by content key to avoid repeated cards
+      const seen = new Set<string>();
+      const uniqueMapped = mapped.filter((event) => {
+        const key = [
+          (event.title || "").toLowerCase(),
+          event.rawDate || "",
+          event.time || "",
+          (event.location || "").toLowerCase(),
+          event.id || "",
+        ].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       
       // Sort by date then time
-      mapped.sort((a, b) => {
+      uniqueMapped.sort((a, b) => {
         if (a.rawDate !== b.rawDate) return a.rawDate.localeCompare(b.rawDate);
         return a.time.localeCompare(b.time);
       });
 
-      setEvents(mapped);
+      setEvents(uniqueMapped);
       
       const now = new Date();
       const todayStr = [
@@ -142,7 +190,7 @@ export default function EventsScreen() {
   useEffect(() => {
     notificationManager.setHasUnreadEvents(false);
     fetchMyEvents();
-  }, [user]);
+  }, [user, language]);
 
   // Derive unique dates that have events, only include Today if it has events
   const availableDates = useMemo(() => {
@@ -183,7 +231,7 @@ export default function EventsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name={language === 'ar' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("events_my_events_title")}</Text>
         <View style={styles.menuButton} />

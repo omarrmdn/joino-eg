@@ -1,25 +1,52 @@
 import { FontAwesome6, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Colors } from "../constants/Colors";
 import { Fonts } from "../constants/Fonts";
 import { useAnimatedSearchPlaceholder } from "../hooks/useAnimatedSearchPlaceholder";
 import { useNotifications } from "../hooks/useNotifications";
+import { useLanguage } from "../lib/i18n";
 import TopbarLogo from "./topbarLogo";
 
 interface TopBarProps {
   searchQuery: string;
   onSearchChange: (text: string) => void;
   onLocationPress: () => void;
+  refreshToken?: number;
 }
 
-export const TopBar = React.memo(({ searchQuery, onSearchChange, onLocationPress }: TopBarProps) => {
+export const TopBar = React.memo(({ searchQuery, onSearchChange: _onSearchChange, onLocationPress, refreshToken }: TopBarProps) => {
   const router = useRouter();
-  const { hasUnreadNotifications } = useNotifications();
+  const { language } = useLanguage();
+  const isRtl = language === "ar" || language === "ar-EG";
+  
+  const { hasUnreadNotifications, hasUnreadMessages, hasUnreadEvents } = useNotifications();
+  const hasAnythingNew = hasUnreadNotifications || hasUnreadMessages || hasUnreadEvents;
+
+  const isEmptyQuery =
+    searchQuery.replace(/[\u200E\u200F\u061C]/g, "").trim().length === 0;
+  
   const animatedPlaceholder = useAnimatedSearchPlaceholder({
-    active: !searchQuery,
+    active: isEmptyQuery,
+    refreshToken,
   });
+  
+  const displayValue = isEmptyQuery ? animatedPlaceholder : searchQuery;
+
+  const barStyle = [
+    styles.searchBarInner, 
+    { flexDirection: isRtl ? "row-reverse" : "row" } as any
+  ];
+
+  const textStyle = [
+    styles.input,
+    isEmptyQuery && styles.placeholderText,
+    { 
+      textAlign: isRtl ? "right" : "left",
+      writingDirection: isRtl ? "rtl" : "ltr" 
+    } as any
+  ];
 
   return (
     <View style={styles.container}>
@@ -28,7 +55,7 @@ export const TopBar = React.memo(({ searchQuery, onSearchChange, onLocationPress
         <TouchableOpacity onPress={() => router.push('/notifications' as any)}>
           <View>
             <Ionicons name="notifications-outline" size={28} color={Colors.white} />
-            {hasUnreadNotifications && <View style={[styles.notificationBubble, { top: 2, right: 2 }]} />}
+            {hasAnythingNew && <View style={[styles.notificationBubble, { top: 2, right: 2 }]} />}
           </View>
         </TouchableOpacity>
       </View>
@@ -37,19 +64,20 @@ export const TopBar = React.memo(({ searchQuery, onSearchChange, onLocationPress
         style={styles.searchContainer} 
         onPress={() => router.push('/search' as any)}
       >
-        <Ionicons name="search" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
-        <TextInput
-          placeholder={animatedPlaceholder}
-          placeholderTextColor={Colors.textSecondary}
-          style={styles.input}
-          value={searchQuery}
-          onChangeText={onSearchChange}
-          editable={false} // Make it a button that navigates
-          pointerEvents="none" 
-        />
-        <TouchableOpacity style={styles.locationButton} onPress={onLocationPress}>
-          <FontAwesome6 name="location-dot" size={18} color={Colors.primary} />
-        </TouchableOpacity>
+        <View style={barStyle}>
+          <Ionicons 
+            name="search" 
+            size={20} 
+            color={Colors.textSecondary} 
+            style={isRtl ? styles.searchIconRtl : styles.searchIconLtr} 
+          />
+          <Text numberOfLines={1} style={textStyle}>
+            {displayValue}
+          </Text>
+          <TouchableOpacity style={styles.locationButton} onPress={onLocationPress}>
+            <FontAwesome6 name="location-dot" size={18} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -82,14 +110,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.gray,
   },
-  searchIcon: {
-    marginHorizontal:8
+  searchBarInner: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  searchIconLtr: {
+    marginLeft: 8,
+    marginRight: 8,
+  },
+  searchIconRtl: {
+    marginRight: 8,
+    marginLeft: 8,
   },
   input: {
     flex: 1,
     color: Colors.gray,
     fontSize: 16,
     fontFamily: Fonts.regular,
+  },
+  placeholderText: {
+    color: Colors.textSecondary,
   },
   locationButton: {
     backgroundColor: Colors.darkflame,
@@ -98,6 +139,7 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   notificationBubble: {
     position: 'absolute',

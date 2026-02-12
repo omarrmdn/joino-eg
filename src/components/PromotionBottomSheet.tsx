@@ -20,6 +20,7 @@ interface PromotionBottomSheetProps {
   onClose: () => void;
   onContinue: (price: number, fillAllSeats: boolean) => void;
   initialPrice?: number;
+  currencySymbol?: string;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -29,6 +30,7 @@ export const PromotionBottomSheet = ({
   onClose,
   onContinue,
   initialPrice = 300,
+  currencySymbol = "$",
 }: PromotionBottomSheetProps) => {
   const { t } = useLanguage();
   const [fillAllSeats, setFillAllSeats] = useState(false);
@@ -69,7 +71,7 @@ export const PromotionBottomSheet = ({
             
             <View style={styles.priceContainer}>
               <View style={styles.priceInputWrapper}>
-                <Text style={styles.currencySymbol}>$</Text>
+                <Text style={styles.currencySymbol}>{currencySymbol}</Text>
                 <TextInput
                   style={styles.priceInput}
                   value={price}

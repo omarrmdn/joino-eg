@@ -7,7 +7,14 @@
       "android": {
         "buildType": "apk"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dml0YWwtY2hpbXAtNzAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://icuvaldfjqmyirzmcjst.supabase.co",
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "pk.eyJ1Ijoib21hcnJtZG4iLCJhIjoiY21sOWJhcDE3MDE2MDNmcjRsdHpyd2QxdSJ9.Sz5JbY6q4f3k6L0Fb1q1bQ",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljdXZhbGRmanFteWlyem1janN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzA1NDMsImV4cCI6MjA4NTc0NjU0M30.9jYkDkLN1ro3esiQb1nzUUSbEEPMuX5MfSDxz6fkFqE",
+        "EXPO_PUBLIC_PROJECT_ID": "58b49d48-07b3-405c-9c37-7074bd897968"
+      }
     },
     "development": {
       "developmentClient": true,
@@ -15,7 +22,14 @@
       "channel": "development"
     },
     "production": {
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dml0YWwtY2hpbXAtNzAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://icuvaldfjqmyirzmcjst.supabase.co",
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "pk.eyJ1Ijoib21hcnJtZG4iLCJhIjoiY21sOWJhcDE3MDE2MDNmcjRsdHpyd2QxdSJ9.Sz5JbY6q4f3k6L0Fb1q1bQ",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljdXZhbGRmanFteWlyem1janN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzA1NDMsImV4cCI6MjA4NTc0NjU0M30.9jYkDkLN1ro3esiQb1nzUUSbEEPMuX5MfSDxz6fkFqE",
+        "EXPO_PUBLIC_PROJECT_ID": "58b49d48-07b3-405c-9c37-7074bd897968"
+      }
     }
   },
   "submit": {

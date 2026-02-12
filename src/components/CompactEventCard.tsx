@@ -4,14 +4,15 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from "react-native-reanimated";
 import { Colors } from "../constants/Colors";
 import { Fonts } from "../constants/Fonts";
 import { useTrackSession } from "../hooks/useTrackSession";
 import { useLanguage } from "../lib/i18n";
+import { formatEventDateLabel, formatEventTime } from "../utils/date";
 import { getRecurringLabel } from "../utils/recurrence";
 
 interface CompactEventCardProps {
@@ -22,14 +23,17 @@ interface CompactEventCardProps {
 export const CompactEventCard = React.memo(({ event, index = 0 }: CompactEventCardProps) => {
   const router = useRouter();
   const { trackAction } = useTrackSession();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const recurringLabel = getRecurringLabel(
     event.isRecurring,
     event.recurrencePattern,
     event.recurrenceDays,
     language,
+    t
   );
-  const dateLabel = recurringLabel || event.day;
+
+  const dateFormatted = formatEventDateLabel(event.rawDate, language);
+  const dateLabel = recurringLabel || dateFormatted || event.day;
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -81,7 +85,7 @@ export const CompactEventCard = React.memo(({ event, index = 0 }: CompactEventCa
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
             <Text style={styles.infoText} numberOfLines={1}>
-              {dateLabel} - {event.time}
+              {dateLabel} - {formatEventTime(event.rawTime || event.time, language)}
             </Text>
           </View>
         </View>

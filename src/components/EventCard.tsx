@@ -15,6 +15,7 @@ import { Fonts } from "../constants/Fonts";
 import { useTrackSession } from "../hooks/useTrackSession";
 import { useLanguage } from "../lib/i18n";
 import { EventCardData } from "../types/database";
+import { formatEventDateLabel, formatEventTime } from "../utils/date";
 import { getRecurringLabel } from "../utils/recurrence";
 import { shareEvent } from "../utils/shareEvent";
 
@@ -26,14 +27,15 @@ interface EventCardProps {
 export const EventCard = React.memo(({ event, index = 0 }: EventCardProps) => {
   const router = useRouter();
   const { trackAction } = useTrackSession();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const recurringLabel = getRecurringLabel(
     event.isRecurring,
     event.recurrencePattern,
     event.recurrenceDays,
     language,
+    t
   );
-  const dateLabel = recurringLabel || event.day;
+  const dateLabel = recurringLabel || formatEventDateLabel(event.rawDate, language) || event.day;
   const isPromoted = PROMOTIONS_ENABLED && !!event.isPromoted;
 
   const scale = useSharedValue(1);
@@ -132,8 +134,8 @@ export const EventCard = React.memo(({ event, index = 0 }: EventCardProps) => {
                   size={18}
                   color={Colors.primary}
                 />
-                <Text style={styles.infoText} numberOfLines={1}>
-                  {dateLabel} - {event.time}
+                <Text style={[styles.infoText, styles.dateText]} numberOfLines={1}>
+                  {dateLabel} - {formatEventTime(event.rawTime || event.time, language)}
                 </Text>
               </View>
             </View>
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
   infoItem: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    width: "50%",
   },
   infoText: {
     color: Colors.white,
@@ -258,7 +260,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
   },
   locationText: {
-    width: "45%",
+    flex: 1,
+    paddingRight: 6,
+  },
+  dateText: {
+    flex: 1,
   },
   footerRow: {
     flexDirection: "row",

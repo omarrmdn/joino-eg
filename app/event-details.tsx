@@ -28,8 +28,10 @@ import { useAlert } from "../src/lib/AlertContext";
 import { TranslationKey, useLanguage } from "../src/lib/i18n";
 import { notificationManager } from "../src/lib/NotificationManager";
 import { useSupabaseClient } from "../src/lib/supabaseConfig";
-import { shareEvent } from "../src/utils/shareEvent";
+// import { parseCurrencyNumber } from "../src/utils/currency";
+import { formatEventDateLabel } from "../src/utils/date";
 import { getRecurringLabel } from "../src/utils/recurrence";
+import { shareEvent } from "../src/utils/shareEvent";
 
 import {
     notifyAttendeeCancellation,
@@ -75,11 +77,17 @@ export default function EventDetailsScreen() {
             eventData.recurrencePattern,
             eventData.recurrenceDays,
             language,
+            t,
+            true // fullSentence
           )
         : null,
-    [eventData, language],
+    [eventData, language, t],
   );
-  const dateLabel = recurringLabel || eventData?.day || "";
+  const dateLabel =
+    recurringLabel ||
+    formatEventDateLabel(eventData?.rawDate || "", language) ||
+    eventData?.day ||
+    "";
 
   const answeredQuestions = React.useMemo(
     () => questions.filter((q) => q.answer && q.answer.trim().length > 0),
@@ -135,6 +143,11 @@ export default function EventDetailsScreen() {
         setQuestionsLoading(false);
         return;
       }
+      if (user?.id && eventData.organizerId && user.id === eventData.organizerId) {
+        setQuestions([]);
+        setQuestionsLoading(false);
+        return;
+      }
       setQuestionsLoading(true);
       try {
         const { data, error: questionsError } = await supabase
@@ -156,7 +169,7 @@ export default function EventDetailsScreen() {
     }
 
     loadQuestions();
-  }, [supabase, eventData]);
+  }, [supabase, eventData, user?.id]);
 
   // Track event view
   React.useEffect(() => {
@@ -215,6 +228,23 @@ export default function EventDetailsScreen() {
       return;
     }
 
+    // Check if event is paid - DEACTIVATED FOR NOW
+    /*
+    const eventPrice = parseCurrencyNumber(eventData.price);
+    if (eventPrice > 0) {
+      // Redirect to checkout
+      router.push({
+        pathname: "/checkout" as any,
+        params: {
+          cost: eventPrice,
+          currency: eventData.currencyCode || "EGP", // Fallback to EGP if not found
+          eventId: eventData.id,
+        }
+      });
+      return;
+    }
+    */
+
     setIsJoining(true);
     trackAction("initiate_join", { eventId: eventData.id, title: eventData.title });
 
@@ -259,10 +289,7 @@ export default function EventDetailsScreen() {
         await notifyAttendeeEventAccessDetails(supabase, eventData.id, user.id);
 
         // Update user spend
-        const eventPrice =
-          typeof eventData.price === "string"
-            ? parseFloat(eventData.price.replace("$", "")) || 0
-            : eventData.price;
+        const eventPrice = parseCurrencyNumber(eventData.price);
 
         if (eventPrice > 0) {
           const { data: userData } = await supabase
@@ -460,6 +487,7 @@ export default function EventDetailsScreen() {
       if (data) {
         setQuestions((prev) => [data as EventQuestion, ...prev]);
         setNewQuestion("");
+        trackAction("question_ask", { eventId: eventData.id, questionId: data.id });
 
         // Notify organizer if not asking themselves
         if (eventData.organizerId && eventData.organizerId !== user.id) {
@@ -515,6 +543,7 @@ export default function EventDetailsScreen() {
             : q,
         ),
       );
+      trackAction("question_answer", { eventId: eventData.id, questionId });
 
       // Notify the question asker
       const question = questions.find((q) => q.id === questionId);
@@ -567,6 +596,12 @@ export default function EventDetailsScreen() {
       if (ratingError) {
         throw ratingError;
       }
+
+      trackAction("event_rate", {
+        eventId: eventData.id,
+        rating,
+        hasComment: !!comment,
+      });
 
       showAlert({
         title: t("rating_thanks_title") || "Thank you!",
@@ -628,7 +663,7 @@ export default function EventDetailsScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <Ionicons name={language === 'ar' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.logo}>{t("event_details_title")}</Text>
         <View style={styles.headerRight}>
@@ -653,9 +688,9 @@ export default function EventDetailsScreen() {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
         <ScrollView
           ref={scrollRef}
@@ -814,65 +849,66 @@ export default function EventDetailsScreen() {
         )}
 
         {/* Q&A Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t("event_questions_header")}</Text>
-          {canAskQuestion && (
-            <View style={styles.askQuestionBar}>
-              <View style={styles.askQuestionContainer}>
-                <TextInput
-                  style={[styles.askQuestionInput, isRTL && styles.inputRtl]}
-                  placeholder={t("event_question_placeholder")}
-                  placeholderTextColor={Colors.gray}
-                  value={newQuestion}
-                  onChangeText={setNewQuestion}
-                  onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
-                  multiline
-                />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={handleSubmitQuestion}
-                  disabled={submittingQuestion}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={
-                      language === "ar"
-                        ? "arrow-back-circle"
-                        : "arrow-forward-circle"
-                    }
-                    size={28}
-                    color={submittingQuestion ? Colors.textSecondary : Colors.primary}
+        {!isOrganizer && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>{t("event_questions_header")}</Text>
+            {canAskQuestion && (
+              <View style={styles.askQuestionBar}>
+                <View style={styles.askQuestionContainer}>
+                  <TextInput
+                    style={[styles.askQuestionInput, isRTL && styles.inputRtl]}
+                    placeholder={t("event_question_placeholder")}
+                    placeholderTextColor={Colors.gray}
+                    value={newQuestion}
+                    onChangeText={setNewQuestion}
+                    onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                    multiline
                   />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          {questionsLoading ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          ) : (
-            <>
-              {answeredQuestions.length === 0 ? (
-                <Text style={styles.emptyQuestionsText}>
-                  {t("event_questions_empty")}
-                </Text>
-              ) : (
-                <View style={styles.questionsList}>
-                  {answeredQuestions.map((q) => (
-                    <QuestionItem
-                      key={q.id}
-                      question={q}
-                      isOrganizer={isOrganizer}
-                      onAnswer={handleAnswerQuestion}
-                      language={language}
-                      t={t}
+                  <TouchableOpacity
+                    style={styles.sendButton}
+                    onPress={handleSubmitQuestion}
+                    disabled={submittingQuestion}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={
+                        language === "ar"
+                          ? "arrow-back-circle"
+                          : "arrow-forward-circle"
+                      }
+                      size={28}
+                      color={submittingQuestion ? Colors.textSecondary : Colors.primary}
                     />
-                  ))}
+                  </TouchableOpacity>
                 </View>
-              )}
-            </>
-          )}
-
-        </View>
+              </View>
+            )}
+            {questionsLoading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <>
+                {answeredQuestions.length === 0 ? (
+                  <Text style={styles.emptyQuestionsText}>
+                    {t("event_questions_empty")}
+                  </Text>
+                ) : (
+                  <View style={styles.questionsList}>
+                    {answeredQuestions.map((q) => (
+                      <QuestionItem
+                        key={q.id}
+                        question={q}
+                        isOrganizer={isOrganizer}
+                        onAnswer={handleAnswerQuestion}
+                        language={language}
+                        t={t}
+                      />
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        )}
 
         {/* Edit / Join / Cancel Button */}
         {isOrganizer ? (
@@ -885,14 +921,23 @@ export default function EventDetailsScreen() {
                   params: { editId: eventData.id },
                 })
               }
-              style={[styles.joinButtonMargin, { flex: 1 }]}
+              style={[styles.joinButtonMargin, { flex: 1.2 }]}
+              textStyle={{ color: Colors.white }}
             />
             {eventData.status !== "canceled" && (
               <Button
                 title={t("event_cancel_event")}
                 onPress={handleCancelEventPress}
-                style={[styles.joinButtonMargin, { flex: 1, backgroundColor: Colors.error }]}
-                textStyle={{ color: Colors.white }}
+                style={[
+                  styles.joinButtonMargin, 
+                  { 
+                    flex: 1, 
+                    backgroundColor: Colors.inputBackground || '#1A1A1A',
+                    borderWidth: 1,
+                    borderColor: Colors.error,
+                  }
+                ]}
+                textStyle={{ color: Colors.error }}
               />
             )}
           </View>
@@ -997,7 +1042,7 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
   const [answerText, setAnswerText] = React.useState(question.answer || "");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const canAnswer = isOrganizer && !question.answer;
-  const isRTL = language === "ar";
+  const isRTL = language === "ar" || language === "ar-EG";
   const hasOrganizerAnswer = !!question.answer && !!question.organizer_id;
 
   const handleSubmit = async () => {
@@ -1032,7 +1077,7 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
             activeOpacity={0.8}
           >
             <Ionicons
-              name={language === "ar" ? "arrow-back-circle" : "arrow-forward-circle"}
+              name={language === "ar" || language === "ar-EG" ? "arrow-back-circle" : "arrow-forward-circle"}
               size={24}
               color={isSubmitting ? Colors.textSecondary : Colors.primary}
             />
@@ -1209,12 +1254,12 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
+    alignItems: "flex-start",
+    gap: 25,
   },
   detailItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     flex: 1,
   },
   detailText: {
@@ -1222,6 +1267,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Fonts.medium,
     marginLeft: 8,
+    flex: 1,
   },
   priceBold: {
     color: Colors.white,

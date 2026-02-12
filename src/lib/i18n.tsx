@@ -1,15 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Localization from "expo-localization";
 import * as Updates from "expo-updates";
 import React, {
     createContext,
     ReactNode,
     useContext,
     useEffect,
+    useRef,
     useState,
 } from "react";
-import { I18nManager } from "react-native";
+import { DevSettings, I18nManager } from "react-native";
+import { getCountryCodeByIP } from "../utils/ip";
 
-type Language = "en" | "ar";
+type Language = "en" | "ar" | "ar-EG";
 
 export type TranslationKey =
   | "tab_home"
@@ -46,6 +49,7 @@ export type TranslationKey =
   | "create_event_title"
   | "edit_event_title"
   | "create_event_banner_hint"
+  | "create_event_image_size_hint"
   | "create_event_title_placeholder"
   | "create_event_description_placeholder"
   | "create_event_type_label"
@@ -81,6 +85,7 @@ export type TranslationKey =
   | "settings_language_description"
   | "settings_language_en"
   | "settings_language_ar"
+  | "settings_language_ar_eg"
   | "messages_title"
   | "messages_empty_title"
   | "messages_empty_body"
@@ -199,6 +204,7 @@ export type TranslationKey =
   | "create_event_edit_not_allowed_msg"
   | "create_event_repeat_note_prefix"
   | "chat_organizer_of"
+  | "chat_attendee"
   | "chat_type_message"
   | "chat_yesterday"
   | "chat_unknown_user"
@@ -233,8 +239,29 @@ export type TranslationKey =
   | "notification_event_canceled_title"
   | "notification_event_canceled_body"
   | "event_cancel_success"
+  | "event_posted_success"
+  | "event_updated_success"
   | "event_cancel_attendance_confirm_message"
-  | "today";
+  | "today"
+  | "filters"
+  | "max_price"
+  | "event_type"
+  | "gender"
+  | "all"
+  | "online"
+  | "onsite"
+  | "male"
+  | "female"
+  | "near_me"
+  | "reset"
+  | "apply"
+  | "tab_search"
+  | "search_input_placeholder"
+  | "recurrence_daily"
+  | "recurrence_weekly"
+  | "recurrence_biweekly"
+  | "recurrence_monthly"
+  | "recurrence_every";
 
 type Translations = Record<Language, Record<TranslationKey, string>>;
 
@@ -274,7 +301,8 @@ export const translations: Translations = {
     event_edit: "Edit Event",
     create_event_title: "Create Event",
     edit_event_title: "Edit Event",
-    create_event_banner_hint: "Add Banner (Optional)",
+    create_event_banner_hint: "Add Banner *",
+    create_event_image_size_hint: "Recommended: 1200 × 900 px (4:3 ratio)",
     create_event_title_placeholder: "Event Title *",
     create_event_description_placeholder: "Description (Optional)",
     create_event_type_label: "Event Type *",
@@ -320,7 +348,8 @@ export const translations: Translations = {
     settings_language: "Language",
     settings_language_description: "Choose your preferred app language.",
     settings_language_en: "English",
-    settings_language_ar: "Arabic",
+    settings_language_ar: "Arabic (Standard)",
+    settings_language_ar_eg: "Egyptian Arabic",
     settings_sign_out: "Sign Out",
     settings_sign_out_confirm_title: "Sign Out",
     settings_sign_out_confirm_message: "Are you sure you want to sign out?",
@@ -392,7 +421,9 @@ export const translations: Translations = {
     onboarding_terms: "By continuing, you agree to our Terms of Service and Privacy Policy.",
     search_results_title: "Search Results",
     search_empty_results: "No results found for",
-    search_placeholder: "Running Race",
+    search_placeholder: "Search for events, people or tags",
+    tab_search: "Search",
+    search_input_placeholder: "search",
     btn_yes_cancel: "Yes, Cancel",
     promote_modal_title: "Boost Your Event\nFill Every Seat.",
     promote_modal_subtitle: "Reach The Right Audience, Boost Engagement, And Make Your Event Unforgettable.",
@@ -427,6 +458,7 @@ export const translations: Translations = {
     create_event_edit_not_allowed_msg: "You can only edit events you organized.",
     create_event_repeat_note_prefix: "This event repeats every",
     chat_organizer_of: "Organizer Of",
+    chat_attendee: "Attendee",
     chat_type_message: "Type a message...",
     chat_yesterday: "Yesterday",
     chat_unknown_user: "Unknown User",
@@ -461,8 +493,27 @@ export const translations: Translations = {
     notification_event_canceled_title: "Event Canceled",
     notification_event_canceled_body: "The event \"{title}\" has been canceled. Reason: {reason}",
     event_cancel_success: "Event canceled successfully.",
+    event_posted_success: "Event posted!",
+    event_updated_success: "Event updated!",
     today: "Today",
+    filters: "Filters",
+    max_price: "Max Price",
+    event_type: "Event Type",
+    gender: "Gender",
+    all: "All",
+    online: "Online",
+    onsite: "Onsite",
+    male: "Male",
+    female: "Female",
+    near_me: "Near me",
+    reset: "Reset",
+    apply: "Apply",
     event_cancel_attendance_confirm_message: "Are you sure you want to cancel your attendance? This will notify the organizer.",
+    recurrence_daily: "Daily",
+    recurrence_weekly: "Weekly",
+    recurrence_biweekly: "Bi-weekly",
+    recurrence_monthly: "Monthly",
+    recurrence_every: "Every",
   },
   ar: {
     tab_home: "الرئيسية",
@@ -499,7 +550,8 @@ export const translations: Translations = {
     event_edit: "تعديل الفعالية",
     create_event_title: "إنشاء فعالية",
     edit_event_title: "تعديل الفعالية",
-    create_event_banner_hint: "إضافة صورة (اختياري)",
+    create_event_banner_hint: "أضف صورة *",
+    create_event_image_size_hint: "الحجم المُوصى به: ١٢٠٠ × ٩٠٠ بكسل (نسبة ٤:٣)",
     create_event_title_placeholder: "عنوان الفعالية *",
     create_event_description_placeholder: "الوصف (اختياري)",
     create_event_type_label: "نوع الفعالية *",
@@ -545,7 +597,8 @@ export const translations: Translations = {
     settings_language: "اللغة",
     settings_language_description: "اختر لغة التطبيق المفضلة لديك.",
     settings_language_en: "الإنجليزية",
-    settings_language_ar: "العربية",
+    settings_language_ar: "العربية (الفصحى)",
+    settings_language_ar_eg: "العربية (المصرية)",
     settings_sign_out: "تسجيل الخروج",
     settings_sign_out_confirm_title: "تسجيل الخروج",
     settings_sign_out_confirm_message: "هل أنت متأكد أنك تريد تسجيل الخروج؟",
@@ -617,7 +670,9 @@ export const translations: Translations = {
     onboarding_terms: "بالاستمرار، فإنك توافق على شروط الخدمة وسياسة الخصوصية الخاصة بنا.",
     search_results_title: "نتائج البحث",
     search_empty_results: "لم يتم العثور على نتائج لـ",
-    search_placeholder: "سباق الجري",
+    search_placeholder: "ابحث عن الفعاليات، الأشخاص أو الوسوم",
+    tab_search: "البحث",
+    search_input_placeholder: "ابحث...",
     btn_yes_cancel: "نعم، إلغاء",
     promote_modal_title: "روج لفعاليتك\nواملأ كل المقاعد.",
     promote_modal_subtitle: "صل إلى الجمهور المناسب، وزد من التفاعل، واجعل فعاليتك لا تُنسى.",
@@ -652,6 +707,7 @@ export const translations: Translations = {
     create_event_edit_not_allowed_msg: "يمكنك فقط تعديل الفعاليات التي نظمتها.",
     create_event_repeat_note_prefix: "تتكرر هذه الفعالية كل",
     chat_organizer_of: "منظم لـ",
+    chat_attendee: "مشارك",
     chat_type_message: "اكتب رسالة...",
     chat_yesterday: "أمس",
     chat_unknown_user: "مستخدم غير معروف",
@@ -686,8 +742,276 @@ export const translations: Translations = {
     notification_event_canceled_title: "تم إلغاء الفعالية",
     notification_event_canceled_body: "تم إلغاء الفعالية \"{title}\". السبب: {reason}",
     event_cancel_success: "تم إلغاء الفعالية بنجاح.",
+    event_posted_success: "تم نشر الفعالية بنجاح",
+    event_updated_success: "تم تحديث الفعالية بنجاح",
     today: "اليوم",
+    filters: "الفلاتر",
+    max_price: "أقصى سعر",
+    event_type: "نوع الفعالية",
+    gender: "الجنس",
+    all: "الكل",
+    online: "أونلاين",
+    onsite: "أونسايت",
+    male: "ذكر",
+    female: "أنثى",
+    near_me: "بالقرب مني",
+    reset: "إعادة تعيين",
+    apply: "تطبيق",
     event_cancel_attendance_confirm_message: "هل أنت متأكد من رغبتك في إلغاء حضورك؟ سيتم إخطار المنظم بذلك.",
+    recurrence_daily: "يوميًا",
+    recurrence_weekly: "أسبوعيًا",
+    recurrence_biweekly: "كل أسبوعين",
+    recurrence_monthly: "شهريًا",
+    recurrence_every: "كل",
+  },
+  "ar-EG": {
+    tab_home: "الرئيسية",
+    tab_my_events: "إيفنتاتي",
+    tab_messages: "الرسايل",
+    tab_you: "حسابي",
+    events_my_events_title: "إيفنتاتي",
+    events_empty: "لسه معملتش أي إيفنتات.",
+    event_details_title: "تفاصيل الإيفنت",
+    event_about: "عن الإيفنت",
+    event_tags: "التاجز",
+    event_questions: "الأسئلة",
+    event_questions_header: "الأسئلة والأجوبة",
+    event_questions_empty: "مفيش أسئلة لسه. كون أول واحد يسأل!",
+    event_attending: "مشارك",
+    event_question_placeholder: "اسأل سؤال عن الإيفنت ده",
+    event_send_question: "إرسال السؤال",
+    event_sending_question: "بيتبعت...",
+    event_join: "انضمام",
+    event_joining: "بيضمك...",
+    event_attending_status: "مشارك في القائمة",
+    event_cancel_attendance: "إلغاء الحضور",
+    event_cancelling_attendance: "بيكنسل...",
+    rating_title: "قيم الإيفنت ده",
+    rating_title_generic: "قيم الإيفنت ده",
+    rating_subtitle: "كانت تجربتك إيه؟",
+    rating_placeholder: "أضف تعليق اختياري",
+    rating_submit: "إرسال التقييم",
+    rating_submitting: "بيتبعت...",
+    rating_skip: "بعدين",
+    rating_thanks_title: "شكراً ليك!",
+    rating_thanks_message: "تم إرسال تقييمك.",
+    rating_error: "مقدرناش نبعت التقييم",
+    event_edit: "تعديل الإيفنت",
+    create_event_title: "إيفنت جديد",
+    edit_event_title: "تعديل الإيفنت",
+    create_event_banner_hint: "أضف صورة *",
+    create_event_image_size_hint: "الحجم المُوصى: ١٢٠٠ × ٩٠٠ بكسل (نسبة ٤:٣)",
+    create_event_title_placeholder: "عنوان الإيفنت *",
+    create_event_description_placeholder: "الوصف (اختياري)",
+    create_event_type_label: "نوع الإيفنت *",
+    create_event_online: "أونلاين",
+    create_event_onsite: "في المكان",
+    create_event_location_online: "رابط الاجتماع *",
+    create_event_location_onsite: "المكان *",
+    create_event_schedule_label: "المواعيد *",
+    create_event_start_date: "تاريخ البداية *",
+    create_event_end_date: "تاريخ النهاية",
+    create_event_time: "الوقت *",
+    create_event_end_time: "وقت النهاية",
+    create_event_end_label: "ميعاد النهاية",
+    create_event_capacity: "العدد",
+    create_event_cost: "التكلفة",
+    create_event_tags_label: "التاجز",
+    create_event_tags_placeholder: "دور أو أضف تتاج...",
+    create_event_gender_label: "الجنس المستهدف *",
+    create_event_gender_all: "الكل",
+    create_event_gender_males: "ولاد",
+    create_event_gender_females: "بنات",
+    create_event_gender_male: "ولاد",
+    create_event_gender_female: "بنات",
+    create_event_publishing: "بيتنشر...",
+    create_event_publish: "نشر",
+    create_event_saving: "بيتحفظ...",
+    create_event_save_changes: "حفظ التعديلات",
+    notifications_title: "الإشعارات",
+    notifications_loading: "بنجيب الإشعارات...",
+    notifications_empty: "مفيش إشعارات لسه",
+    notifications_type_new_attendee: "مشارك جديد",
+    notifications_type_attendee_cancel: "إلغاء اشتراك",
+    notifications_type_event_reminders: "تذكير بالإيفنتات",
+    notifications_type_questions: "أسئلة جديدة",
+    notifications_type_new_events_nearby: "إيفنتات جديدة جنبك",
+    notifications_type_event_stats: "إحصائيات الإيفنتات",
+    notifications_type_push_enabled: "تفعيل الإشعارات",
+    notifications_save: "حفظ التفضيلات",
+    notifications_saving: "بيتحفظ...",
+    notifications_save_error: "فشل حفظ التفضيلات.",
+    location_near_me: "قريب مني",
+    settings_title: "الإعدادات",
+    settings_language: "اللغة",
+    settings_language_description: "اختار لغة التطبيق اللي تحبها.",
+    settings_language_en: "English",
+    settings_language_ar: "العربية (الفصحى)",
+    settings_language_ar_eg: "المصرية",
+    settings_sign_out: "تسجيل الخروج",
+    settings_sign_out_confirm_title: "تسجيل الخروج",
+    settings_sign_out_confirm_message: "متأكد إنك عايز تخرج؟",
+    settings_sign_out_cancel: "إلغاء",
+    settings_sign_out_confirm: "خروج",
+    messages_title: "الرسايل",
+    messages_empty_title: "مفيش رسايل لسه.",
+    messages_empty_body: "أي محادثة مع المنظمين أو المشاركين هتظهر هنا.",
+    profile_account: "الحساب",
+    profile_settings: "الإعدادات",
+    profile_support: "الدعم",
+    profile_total_spend: "إجمالي المصاريف",
+    profile_total_revenue: "إجمالي المكسب",
+    profile_ad_center: "مركز الإعلانات",
+    profile_interests: "اهتماماتي",
+    profile_edit: "تعديل",
+    profile_done: "تم",
+    profile_no_interests: "لسه ما ضفتش أي اهتمامات. دوس تعديل عشان تضيف!",
+    error_generic: "حصل مشكلة. حاول تاني كده.",
+    error_required_fields: "يا ريت تملى كل الخانات المطلوبة (*) ",
+    error_location_required_onsite: "يا ريت تكتب المكان فين بالظبط.",
+    error_link_required_online: "يا ريت تحط رابط الإيفنت.",
+    error_invalid_online_link: "يا ريت تحط رابط صح (بيبدأ بـ http:// أو https:// ومن غير مسافات).",
+    error_login_required: "لازم تسجل دخول عشان تكمل.",
+    error_past_date_title: "تاريخ مش صح",
+    error_past_date_message: "ما ينفعش تختار تاريخ قديم.",
+    error_permission_photos: "محتاجين إذن الوصول للصور عشان تقدر ترفع صورة للإيفنت.",
+    event_question_empty_error: "يا ريت تكتب السؤال الأول.",
+    event_question_submitted_title: "تمام",
+    event_question_submitted: "سؤالك اتبعث بنجاح.",
+    event_question_submit_error: "مقدرناش نبعت السؤال.",
+    error_capacity_price_invalid: "يا ريت تحط عدد وسعر منطقيين (مش رقم تليفون).",
+    error_location_google_required: "اختار المكان من الاقتراحات عشان نعرف نحطه على الخريطة.",
+    error_notification_preference: "مقدرناش نجيب تفضيلات الإشعارات.",
+    location_permission_msg: "محتاجين إذن الموقع عشان نجيب أقرب الإيفنتات ليك",
+    location_error_msg: "مقدرناش نوصّل لمكانك",
+    location_retry_title: "افتح الموقع عشان تشوف الإيفنتات القريبة منك",
+    location_settings_title: "الإذن مطلوب",
+    location_settings_msg: "يا ريت تفعل الوصول للموقع من الإعدادات عشان تشوف الإيفنتات القريبة.",
+    btn_no_thanks: "لا شكراً",
+    btn_ok: "ماشي",
+    btn_cancel: "إلغاء",
+    btn_open_settings: "فتح الإعدادات",
+    event_by: "بواسطة",
+    event_description: "الوصف",
+    event_gender: "الجنس",
+    event_gender_male: "ولاد",
+    event_gender_female: "بنات",
+    event_gender_all: "الكل",
+    event_no_questions: "مفيش أسئلة لسه. كوني أول واحدة تسأل!",
+    event_answer: "الإجابة",
+    event_answer_placeholder: "اكتب إجابتك...",
+    event_no_answer_yet: "مفيش إجابة لسه",
+    event_not_found: "الإيفنت مش موجود",
+    create_event_delete: "حذف الإيفنت",
+    create_event_delete_confirm_title: "حذف الإيفنت",
+    create_event_delete_confirm_message: "متأكد إنك عايز تحذف الإيفنت ده؟ مش هتعرف ترجع في كلامك تاني.",
+    create_event_promote: "روج للإيفنت بتاعك",
+    promotion_price_title: "السعر",
+    promotion_fill_seats: "إملى كل الكراسي",
+    promotion_compliance_note: "لو ملمناش الكراسي كلها هتاخد تعويض",
+    promotion_continue: "كمل عشان تشتري",
+    home_featured_popular: "مشهور في",
+    home_featured_interested: "عشان إنت مهتم بـ",
+    home_featured_suggested: "مقترحات ليك",
+    onboarding_title: "جوينو",
+    onboarding_subtitle: "استكشف وانضم لأحسن الإيفنتات اللي حواليك.",
+    onboarding_google_button: "كمل مع جوجل",
+    onboarding_terms: "باستمرارك، إنت بتوافق على شروط الخدمة وسياسة الخصوصية بتاعتنا.",
+    search_results_title: "نتائج البحث",
+    search_empty_results: "مفيش نتائج لـ",
+    search_placeholder: "دور على إيفنتات، ناس، أو تاجز",
+    tab_search: "البحث",
+    search_input_placeholder: "دور هنا...",
+    btn_yes_cancel: "أيوة، كنسل",
+    promote_modal_title: "روج لإيفنتك\nواملى كل الأماكن.",
+    promote_modal_subtitle: "وصل للناس الصح، وزود التفاعل، وخلي إيفنتك ما يتنسيش.",
+    promote_modal_boost_button: "ترويج بـ ٥٠ ج.م",
+    promote_modal_secondary_action: "أو اختار ميزانيتك",
+    home_nearby: "إيفنتات قريبة منك",
+    home_trending: "تريند دلوقتي",
+    home_no_events: "مفيش إيفنتات",
+    home_no_events_tag: "مفيش إيفنتات بالتاج ده",
+    error_title: "مشكلة",
+    settings_reload_note: "ممكن تحتاج تفتح الشاشات تاني عشان اللغة تتغير بالكامل.",
+    profile_update_failed: "فشل التحديث",
+    profile_update_failed_msg: "معلش، مقدرناش نحفظ اهتماماتك. حاول تاني.",
+    profile_name_empty: "الاسم ما ينفعش يبقى فاضي",
+    profile_update_profile_failed: "فشل تحديث البروفايل",
+    profile_permission_photos: "الإذن اترفض",
+    profile_permission_photos_msg: "محتاجين نوصل لصورك عشان تغير صورتك الشخصية.",
+    profile_file_too_large: "الملف كبير أوي",
+    profile_file_too_large_msg: "يا ريت تختار صورة أصغر من ٥ ميجابايت.",
+    profile_update_success: "نجاح",
+    profile_update_success_msg: "تم تحديث الصورة الشخصية بنجاح",
+    profile_update_image_failed: "فشل تحديث صورة البروفايل",
+    profile_load_failed: "فشل تحميل بياناتك",
+    profile_name_placeholder: "اسمك",
+    profile_user_name_fallback: "اسم المستخدم",
+    create_event_repeat_weekly: "تكرار أسبوعي",
+    create_event_repeat_helper_prefix: "الإيفنت ده هيتكرر كل",
+    create_event_repeat_helper_until: "لحد",
+    create_event_repeat_helper_no_end: "من غير تاريخ نهاية",
+    create_event_edit_login_required: "لازم تسجل دخول عشان تعدل الإيفنت",
+    create_event_edit_not_allowed: "غير مسموح",
+    create_event_edit_not_allowed_msg: "تقدر بس تعدل الإيفنتات اللي إنت نظمتها.",
+    create_event_repeat_note_prefix: "الإيفنت ده بيتكرر كل",
+    chat_organizer_of: "منظم لـ",
+    chat_attendee: "مشارك",
+    chat_type_message: "اكتب رسالة...",
+    chat_yesterday: "امبارح",
+    chat_unknown_user: "مستخدم غير معروف",
+    chat_general_role: "عام",
+    event_only: "فقط",
+    notification_new_attendee_title: "مشارك جديد!",
+    notification_new_attendee_body: "{name} انضم لإيفنتك \"{title}\"",
+    notification_event_access_online_title: "رابط الإيفنت أونلاين",
+    notification_event_access_onsite_title: "تفاصيل مكان الإيفنت",
+    notification_event_access_online_body: "انضم للإيفنت \"{title}\" عن طريق الرابط ده: {link}",
+    notification_event_access_onsite_body: "ده مكان الإيفنت \"{title}\": {location}",
+    notification_cancellation_title: "إلغاء حضور",
+    notification_cancellation_body: "{name} كنسل حضوره في \"{title}\"",
+    notification_reminder_title: "تذكير بالإيفنت!",
+    notification_reminder_body: "إيفنت \"{title}\" هيبدأ كمان {hours} ساعات",
+    notification_question_title: "سؤال جديد",
+    notification_question_body: "{name} سأل سؤال عن \"{title}\"",
+    notification_answer_title: "تم الرد على السؤال",
+    notification_answer_body: "{name} رد على سؤالك عن \"{title}\"",
+    notification_nearby_title: "إيفنت قريب منك!",
+    notification_nearby_body: "إيفنت \"{title}\" على بعد {distance} كم منك",
+    profile_follow_us: "تابعنا على",
+    event_canceled: "ملغى",
+    event_ended: "خلص",
+    event_cancellation_reason: "سبب الإلغاء",
+    event_cancel_event: "إلغاء الإيفنت",
+    event_cancel_event_confirm_title: "إلغاء الإيفنت",
+    event_cancel_event_confirm_message: "متأكد إنك عايز تكنسل الإيفنت ؟ هنبلغ كل اللي حاجزين.",
+    event_cancellation_reason_placeholder: "اكتب سبب الإلغاء...",
+    error_event_canceled: "الإيفنت ده اتكنسل .",
+    error_event_ended: "الإيفنت ده خلص .",
+    notification_event_canceled_title: "الإيفنت اتكنسل",
+    notification_event_canceled_body: "إيفنت \"{title}\" اتكنسل. السبب: {reason}",
+    event_cancel_success: "تم إلغاء الإيفنت بنجاح.",
+    event_posted_success: "الإيفنت اتنشر خلاص!",
+    event_updated_success: "تم تحديث الإيفنت!",
+    today: "النهاردة",
+    filters: "الفلاتر",
+    max_price: "أعلى سعر",
+    event_type: "نوع الإيفنت",
+    gender: "النوع",
+    all: "الكل",
+    online: "أونلاين",
+    onsite: "في المكان",
+    male: "ولاد",
+    female: "بنات",
+    near_me: "قريب مني",
+    reset: "إعادة ضبط",
+    apply: "تطبيق",
+    event_cancel_attendance_confirm_message: "متأكد إنك عايز تكنسل حضورك؟ هنبلغ المنظم.",
+    recurrence_daily: "يوميًا",
+    recurrence_weekly: "أسبوعيًا",
+    recurrence_biweekly: "كل أسبوعين",
+    recurrence_monthly: "شهريًا",
+    recurrence_every: "كل",
   },
 };
 
@@ -706,13 +1030,37 @@ const STORAGE_KEY = "app_language";
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
   const [hydrated, setHydrated] = useState(false);
+  const previousLanguageRef = useRef<Language | null>(null);
 
   useEffect(() => {
     const loadLanguage = async () => {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved === "en" || saved === "ar") {
-          setLanguageState(saved);
+        if (saved && (saved === "en" || saved === "ar" || saved === "ar-EG")) {
+          setLanguageState(saved as Language);
+        } else {
+          // prioritized IP based detection instead of system location
+          console.log("[i18n] Detecting country by IP...");
+          const ipCountry = await getCountryCodeByIP();
+          console.log(`[i18n] IP Country: ${ipCountry}`);
+
+          const isEgypt = ipCountry === "EG";
+          
+          if (isEgypt) {
+            console.log(`[i18n] User detected in Egypt by IP. Defaulting to ar-EG.`);
+            setLanguageState("ar-EG");
+          } else {
+            // Fallback to locale if IP fails or isn't Egypt
+            const locales = Localization.getLocales();
+            const firstLocale = locales[0];
+            const localeStr = firstLocale?.languageTag || firstLocale?.languageCode || "";
+            
+            if (localeStr.startsWith("ar")) {
+              setLanguageState("ar");
+            } else {
+              setLanguageState("en");
+            }
+          }
         }
       } catch (e) {
         console.warn("Failed to load language preference", e);
@@ -723,43 +1071,54 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     loadLanguage();
   }, []);
 
-  // Apply RTL/LTR layout based on selected language
+  // Apply RTL/LTR layout based on selected language and force app reload on change
   useEffect(() => {
     if (!hydrated) return;
 
-    const shouldUseRTL = language === "ar";
+    const shouldUseRTL = language === "ar" || language === "ar-EG";
+    const previousLanguage = previousLanguageRef.current;
+    previousLanguageRef.current = language;
 
+    const languageChanged = previousLanguage !== null && previousLanguage !== language;
+    
+    // DISABLE automatic reload on boot to prevent black screen loops.
+    // RTL should be configured on the next manual language change or manual app restart.
     if (I18nManager.isRTL !== shouldUseRTL) {
-      console.log(`[i18n] Language changed to ${language}. RTL mismatch. Forcing reload...`);
+      console.log(`[i18n] RTL Mismatch detected (Current: ${I18nManager.isRTL}, Target: ${shouldUseRTL}).`);
+      console.log(`[i18n] Auto-reload on boot is disabled for stability.`);
       
-      // Update I18nManager
       I18nManager.allowRTL(shouldUseRTL);
       I18nManager.forceRTL(shouldUseRTL);
-
-      // We use a small flag to prevent immediate re-triggering if the reload is delayed
-      const timer = setTimeout(async () => {
-        try {
-          if (Updates.reloadAsync) {
-            await Updates.reloadAsync();
-          } else {
-            console.warn("[i18n] Updates.reloadAsync is not available");
-          }
-        } catch (e) {
-          console.warn("[i18n] Failed to reload app after RTL change", e);
-        }
-      }, 500); // 500ms delay to let things settle
-
-      return () => clearTimeout(timer);
+      
+      // We only reload if the user EXPLICITLY changed the language in this session
+      if (languageChanged) {
+          const timer = setTimeout(async () => {
+            try {
+              console.log("[i18n] Reloading for EXPLICIT language change...");
+              if (__DEV__) {
+                if (typeof DevSettings !== 'undefined' && DevSettings.reload) {
+                  DevSettings.reload();
+                }
+              } else if (Updates && Updates.reloadAsync) {
+                await Updates.reloadAsync();
+              }
+            } catch (e) {
+              console.warn("[i18n] Reload failed", e);
+            }
+          }, 1000);
+          return () => clearTimeout(timer);
+      }
     }
   }, [language, hydrated]);
 
   const contextValue = React.useMemo(() => {
     const t = (key: TranslationKey): string => {
-      const table = translations[language];
+      const table = translations[language] || translations["en"];
+      if (!table) return key;
       const translation = table[key];
       if (!translation) {
         console.warn(`Missing translation for key: ${key}`);
-        return key;
+        return translations["en"]?.[key] || key;
       }
       return translation;
     };
@@ -798,7 +1157,7 @@ export function useLanguage(): LanguageContextValue {
  */
 export async function getStaticT() {
   const saved = await AsyncStorage.getItem("app_language");
-  const lang: Language = (saved === "ar" || saved === "en") ? saved : "en";
+  const lang: Language = (saved === "ar" || saved === "ar-EG" || saved === "en") ? saved as Language : "en";
   
   return (key: TranslationKey, replacements?: Record<string, string | number>) => {
     let text = translations[lang][key] || key;

@@ -39,7 +39,7 @@ type Conversation = {
   unread?: boolean;
   avatar: string | null;
   otherUserId: string;
-  eventId: string;
+  lastEventId: string | null;
   messages: ConversationMessage[];
 };
 
@@ -123,7 +123,7 @@ export default function MessagesScreen() {
       const otherUser = isFromMe ? msg.recipient : msg.sender;
       const otherUserId = isFromMe ? msg.recipient_id : msg.sender_id;
       const eventId = msg.event_id;
-      const convId = `${otherUserId}_${eventId}`;
+      const convId = `${otherUserId}`;
 
       if (!groups[convId]) {
         groups[convId] = {
@@ -136,7 +136,8 @@ export default function MessagesScreen() {
           unread: !isFromMe && !msg.read,
           avatar: otherUser?.image_url || null,
           otherUserId,
-          eventId,
+          lastEventId: eventId ?? null,
+          eventOrganizerId: msg.event?.organizer_id || null,
           messages: [],
         };
       }
@@ -146,6 +147,9 @@ export default function MessagesScreen() {
         groups[convId].lastMessage = msg.body;
         groups[convId].time = formatTimeForList(msg.created_at, t, language);
         groups[convId].lastTimestamp = msg.created_at;
+        groups[convId].role = msg.event?.title || t("chat_general_role");
+        groups[convId].lastEventId = eventId ?? null;
+        groups[convId].eventOrganizerId = msg.event?.organizer_id || null;
       }
 
       groups[convId].messages.push({
@@ -207,7 +211,6 @@ export default function MessagesScreen() {
               const lastMsg = messages.find(m => 
                 m.recipient_id === user?.id && 
                 m.sender_id === item.otherUserId && 
-                m.event_id === item.eventId && 
                 !m.read
               );
               if (lastMsg) markAsRead(lastMsg.id);

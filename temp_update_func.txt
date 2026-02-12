@@ -1,0 +1,38 @@
+
+  // Function to update location in database and handle currency
+  const updateLocationInDatabase = useCallback(async (location: Location.LocationObject) => {
+    if (!user?.id) return;
+
+    try {
+      const [address] = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+      });
+      
+      const locationString = address ? `${address.city || ''}, ${address.country || ''}` : `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`;
+
+      if (address && address.city) {
+          setUserCity(address.city);
+      }
+
+      await supabase.from('users').update({ 
+          last_location: locationString,
+          country_code: address?.isoCountryCode || null,
+      }).eq('id', user.id);
+
+      if (address?.isoCountryCode) {
+        const detectedCode = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          address.isoCountryCode,
+        );
+        
+        // If currency changed or was detected, refetch events
+        if (detectedCode) {
+            await refetch();
+        }
+      }
+    } catch (err) {
+      console.warn("Error updating location/currency:", err);
+    }
+  }, [user?.id, supabase, refetch]);

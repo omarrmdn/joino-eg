@@ -13,7 +13,18 @@ export function useSupabaseClient() {
         return createClient(supabaseUrl, supabaseAnonKey, {
             global: {
                 fetch: async (url, options = {}) => {
-                    const token = await getToken({ template: 'supabase' });
+                    const getAuthToken = async (forceRefresh: boolean) => {
+                        try {
+                            return await getToken({
+                                template: 'supabase',
+                                ...(forceRefresh ? { skipCache: true } : {}),
+                            });
+                        } catch {
+                            return null;
+                        }
+                    };
+
+                    const token = await getAuthToken(false);
 
                     // 1. Start with base headers
                     const headers: any = {
@@ -61,10 +72,23 @@ export function useSupabaseClient() {
                         console.log(`[Supabase Fetch] Body Type:`, options.body ? typeof options.body : 'none');
                     }
 
-                    return fetch(url, {
+                    const doFetch = async (overrideHeaders?: any) => fetch(url, {
                         ...options,
-                        headers,
+                        headers: overrideHeaders || headers,
                     });
+
+                    const response = await doFetch();
+
+                    // Retry once with a refreshed token if we hit auth errors
+                    if ((response.status === 401 || response.status === 403) && token) {
+                        const refreshedToken = await getAuthToken(true);
+                        if (refreshedToken && refreshedToken !== token) {
+                            const retryHeaders = { ...headers, Authorization: `Bearer ${refreshedToken}` };
+                            return doFetch(retryHeaders);
+                        }
+                    }
+
+                    return response;
                 },
             },
         });

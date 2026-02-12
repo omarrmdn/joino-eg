@@ -28,7 +28,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 200,
     paddingVertical: 12,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    justifyContent: 'center',
     marginVertical: 10,
   },
   buttonDisabled: {
@@ -38,6 +40,7 @@ const styles = StyleSheet.create({
     color: Colors.black,
     fontSize: 16,
     fontFamily: Fonts.semibold,
+    textAlign: 'center',
   },
   buttonTextDisabled: {
     opacity: 0.8,

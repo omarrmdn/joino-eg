@@ -2,10 +2,11 @@ import { useUser } from '@clerk/clerk-expo';
 import { useCallback, useEffect, useState } from 'react';
 import { notificationManager } from '../lib/NotificationManager';
 import { useSupabaseClient } from '../lib/supabaseConfig';
+import { useTrackSession } from './useTrackSession';
 
 export interface DBMessage {
     id: string;
-    event_id: string;
+    event_id: string | null;
     sender_id: string;
     recipient_id: string;
     message_type: 'event_published' | 'event_update' | 'general' | 'event_link';
@@ -25,12 +26,14 @@ export interface DBMessage {
     };
     event?: {
         title: string;
+        organizer_id?: string | null;
     };
 }
 
 export function useMessages() {
     const { user } = useUser();
     const supabase = useSupabaseClient();
+    const { trackAction } = useTrackSession();
     const [messages, setMessages] = useState<DBMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function useMessages() {
           *,
           sender:users!messages_sender_id_fkey (name, image_url),
           recipient:users!messages_recipient_id_fkey (name, image_url),
-          event:events (title)
+          event:events (title, organizer_id)
         `)
                 .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
                 .order('created_at', { ascending: false });
@@ -120,6 +123,12 @@ export function useMessages() {
 
             if (sendError) throw sendError;
             setMessages(prev => [data, ...prev]);
+            trackAction('message_send', {
+                messageId: data.id,
+                eventId: data.event_id,
+                recipientId: data.recipient_id,
+                senderId: data.sender_id
+            });
             return data;
         } catch (err) {
             console.error('Error sending message:', err);
@@ -136,6 +145,7 @@ export function useMessages() {
 
             if (updateError) throw updateError;
             setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
+            trackAction('message_read', { messageId });
         } catch (err) {
             console.error('Error marking message as read:', err);
         }
@@ -152,6 +162,7 @@ export function useMessages() {
 
             if (updateError) throw updateError;
             setMessages(prev => prev.map(m => m.recipient_id === user.id ? { ...m, read: true } : m));
+            trackAction('message_read', { all: true });
         } catch (err) {
             console.error('Error marking all messages as read:', err);
         }

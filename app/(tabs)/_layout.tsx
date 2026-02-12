@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 import { Tabs } from "expo-router";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../src/constants/Colors";
 import { Fonts } from "../../src/constants/Fonts";
@@ -9,6 +10,7 @@ import { useNotifications } from "../../src/hooks/useNotifications";
 import { useSupabaseSync } from "../../src/hooks/useSupabaseSync";
 import { useTrackSession } from "../../src/hooks/useTrackSession";
 import { useUnreadMessagesSync } from "../../src/hooks/useUnreadMessagesSync";
+import { useUserAnalytics } from "../../src/hooks/useUserAnalytics";
 import { useLanguage } from "../../src/lib/i18n";
 
 const CustomTabButton = ({ children, onPress }: any) => (
@@ -30,6 +32,8 @@ export default function TabLayout() {
   useUnreadMessagesSync();
   const { hasUnreadEvents, hasUnreadMessages } = useNotifications();
   const { t } = useLanguage();
+  const { user } = useUser();
+  const { userData } = useUserAnalytics();
    const insets = useSafeAreaInsets();
   return (
     <Tabs
@@ -112,11 +116,17 @@ export default function TabLayout() {
         options={{
           title: t("tab_you"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={24}
-              color={color}
-            />
+            (userData?.image_url || user?.imageUrl) ? (
+              <View style={[styles.avatarWrapper, focused && styles.avatarWrapperActive]}>
+                <Image source={{ uri: userData?.image_url || user?.imageUrl }} style={styles.avatarImage} />
+              </View>
+            ) : (
+              <Ionicons
+                name={focused ? "person" : "person-outline"}
+                size={24}
+                color={color}
+              />
+            )
           ),
         }}
       />
@@ -169,5 +179,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderWidth: 1,
     borderColor: Colors.black,
+  },
+  avatarWrapper: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.gray,
+  },
+  avatarWrapperActive: {
+    borderColor: Colors.primary,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
 });

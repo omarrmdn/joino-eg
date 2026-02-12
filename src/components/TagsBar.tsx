@@ -9,6 +9,8 @@ import { TagPill } from './TagPill';
 interface TagsBarProps {
   activeTag: string;
   onTagPress: (tag: string) => void;
+  refreshToken?: number;
+  tags?: string[]; // Optional filtered tags from parent
 }
 
 const shuffleArray = (items: string[]) => {
@@ -43,19 +45,35 @@ const buildMixedTags = (interests: string[], others: string[], limit: number) =>
   return result;
 };
 
-export const TagsBar = React.memo(({ activeTag, onTagPress }: TagsBarProps) => {
-  const { tags, tagObjects, loading } = useTags();
+export const TagsBar = React.memo(({ activeTag, onTagPress, refreshToken, tags: propTags }: TagsBarProps) => {
+  const { tags: hookTags, tagObjects, loading, refetch } = useTags();
   const { user } = useUser();
   const supabase = useSupabaseClient();
   const [personalizedTags, setPersonalizedTags] = useState<string[]>([]);
   const [isPersonalizing, setIsPersonalizing] = useState(true);
 
+  // Use props tags if provided (for smart filtering), otherwise hook tags
+  const baseTags = propTags || hookTags;
+
+  useEffect(() => {
+    if (typeof refreshToken === "number" && refreshToken > 0) {
+      refetch();
+    }
+  }, [refreshToken, refetch]);
+
   useEffect(() => {
     async function personalizeTags() {
-      const pinnedTags = tags.slice(0, 2).filter(Boolean);
-      const restTags = tags.slice(pinnedTags.length);
+      // If no tags yet, skip
+      if (baseTags.length === 0) {
+        setPersonalizedTags([]);
+        setIsPersonalizing(loading);
+        return;
+      }
 
-      if (!user || tags.length === 0) {
+      const pinnedTags = baseTags.slice(0, 2).filter(Boolean);
+      const restTags = baseTags.slice(pinnedTags.length);
+
+      if (!user) {
         const mixed = shuffleArray(restTags).slice(0, Math.max(0, 10 - pinnedTags.length));
         setPersonalizedTags([...pinnedTags, ...mixed]);
         setIsPersonalizing(false);
@@ -81,7 +99,7 @@ export const TagsBar = React.memo(({ activeTag, onTagPress }: TagsBarProps) => {
             .filter(t => userInterests.includes(t.name))
             .map(t => t.label);
 
-          // Get other tags not in user interests
+          // Get other tags not in user interests (limited to baseTags)
           const availableInterestLabels = restTags.filter(tag => interestedLabels.includes(tag));
           const otherTags = restTags.filter(tag => !availableInterestLabels.includes(tag));
 
@@ -103,9 +121,9 @@ export const TagsBar = React.memo(({ activeTag, onTagPress }: TagsBarProps) => {
     }
 
     personalizeTags();
-  }, [user, tags, tagObjects, supabase]);
+  }, [user, baseTags, tagObjects, supabase, refreshToken, loading]);
 
-  if (loading || isPersonalizing) {
+  if (loading && baseTags.length === 0) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="small" color={Colors.primary} />
@@ -118,7 +136,7 @@ export const TagsBar = React.memo(({ activeTag, onTagPress }: TagsBarProps) => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent } 
+        contentContainerStyle={styles.scrollContent} 
       >
       {personalizedTags.map((tag) => (
           <TagPill
@@ -136,7 +154,6 @@ export const TagsBar = React.memo(({ activeTag, onTagPress }: TagsBarProps) => {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 10,
-   
   },
   loadingContainer: {
     alignItems: 'center',

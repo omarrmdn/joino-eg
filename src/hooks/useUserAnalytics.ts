@@ -132,7 +132,7 @@ export function useUserAnalytics() {
             });
 
             if (funcError) {
-                console.warn("Failed to call analyze-user-preferences edge function:", funcError);
+                console.log(`[useUserAnalytics] Edge function notice: ${funcError.message || 'Unauthorized or not configured'}`);
             }
         } catch (err) {
             console.error('Error tracking action with edge function:', err);

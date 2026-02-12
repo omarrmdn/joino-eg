@@ -268,13 +268,15 @@ export async function notifyNewQuestion(
 
     // Also persist the question in the organizer's inbox
     if (organizerId !== askerId) {
+      // Create message regardless of previous conversation history
       const { error: messageError } = await client.from('messages').insert({
         event_id: eventId,
         sender_id: askerId,
         recipient_id: organizerId,
         message_type: 'general',
-        subject: t('notification_question_title'),
+        subject: event.title,
         body: questionText,
+        created_at: new Date().toISOString(),
       });
 
       if (messageError) {
@@ -301,7 +303,7 @@ export async function notifyQuestionAnswer(
   try {
     const { data: event, error: eventError } = await client
       .from('events')
-      .select('title')
+      .select('title, organizer_id')
       .eq('id', eventId)
       .single();
 
@@ -321,6 +323,26 @@ export async function notifyQuestionAnswer(
       t('notification_answer_body', { name: organizerName, title: event.title }),
       notificationData
     );
+
+    // Also persist the answer in the inbox as a message from organizer
+    if (event.organizer_id && event.organizer_id !== attendeeId) {
+      // We assume the answer notification body as the message body for now
+      const messageBody = t('notification_answer_body', { name: organizerName, title: event.title });
+
+      const { error: messageError } = await client.from('messages').insert({
+        event_id: eventId,
+        sender_id: event.organizer_id,
+        recipient_id: attendeeId,
+        message_type: 'general',
+        subject: event.title,
+        body: messageBody,
+        created_at: new Date().toISOString(),
+      });
+
+      if (messageError) {
+        console.error('Error sending answer message:', messageError);
+      }
+    }
 
     return { success: true };
   } catch (error: any) {

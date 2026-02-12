@@ -39,10 +39,11 @@ const buildMixedList = (interests: string[], others: string[], limit: number) =>
 interface AnimatedPlaceholderOptions {
   active?: boolean;
   maxItems?: number;
+  refreshToken?: number;
 }
 
 export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions = {}) => {
-  const { active = true, maxItems = 6 } = options;
+  const { active = true, maxItems = 6, refreshToken } = options;
   const { t, language } = useLanguage();
   const { user } = useUser();
   const supabase = useSupabaseClient();
@@ -92,7 +93,7 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
     const withFallback = mixed.length > 0 ? mixed : baseTags.slice(0, maxItems);
     const unique = Array.from(new Set([t("search_placeholder"), ...withFallback]));
     setPool(unique);
-  }, [tags, tagObjects, userInterests, maxItems, t]);
+  }, [tags, tagObjects, userInterests, maxItems, t, refreshToken]);
 
   useEffect(() => {
     if (!active || pool.length === 0) {

@@ -23,7 +23,13 @@ export default function OnboardingScreen({ onFinish }: { onFinish: () => void })
   const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
 
   const toggleLanguage = () => {
-    setLanguage(language === 'en' ? 'ar' : 'en');
+    if (language === 'en') {
+      setLanguage('ar-EG');
+    } else if (language === 'ar-EG') {
+      setLanguage('ar');
+    } else {
+      setLanguage('en');
+    }
   };
 
   const handleGoogleLogin = React.useCallback(async () => {
@@ -52,12 +58,16 @@ export default function OnboardingScreen({ onFinish }: { onFinish: () => void })
     <SafeAreaView style={styles.container}>
       {/* Language Toggle Button */}
       <TouchableOpacity 
-        style={[styles.languageButton, language === 'ar' ? styles.languageButtonLeft : styles.languageButtonRight]}
+        style={[
+          styles.languageButton, 
+          language === 'en' ? styles.languageButtonRight : styles.languageButtonLeft,
+        ]}
         onPress={toggleLanguage}
         activeOpacity={0.7}
       >
-        <Ionicons name="language" size={24} color={Colors.white} />
-        <Text style={styles.languageButtonText}>{language === 'en' ? 'ع' : 'EN'}</Text>
+        <Text style={styles.languageButtonText}>
+          {language === 'en' ? 'مصري' : language === 'ar-EG' ? 'عربي' : 'EN'}
+        </Text>
       </TouchableOpacity>
 
       <View style={styles.content}>
@@ -164,13 +174,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 50,
     zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   languageButtonLeft: {
     left: 20,
@@ -180,7 +185,7 @@ const styles = StyleSheet.create({
   },
   languageButtonText: {
     color: Colors.white,
-    fontSize: 14,
+    fontSize: 20,
     fontFamily: Fonts.semibold,
   },
 });

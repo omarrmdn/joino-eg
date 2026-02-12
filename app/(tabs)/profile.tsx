@@ -24,10 +24,16 @@ import { Colors } from "../../src/constants/Colors";
 import { PROMOTIONS_ENABLED } from "../../src/constants/FeatureFlags";
 import { Fonts } from "../../src/constants/Fonts";
 import { useTags } from "../../src/hooks/useEvents";
+import { useTrackSession } from "../../src/hooks/useTrackSession";
 import { useUserAnalytics } from "../../src/hooks/useUserAnalytics";
 import { useAlert } from "../../src/lib/AlertContext";
 import { useLanguage } from "../../src/lib/i18n";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
+import {
+    CurrencyContext,
+    formatCurrencyAmount,
+    getCurrencyInfo,
+} from "../../src/utils/currency";
 
 export default function ProfileScreen() {
   const { user } = useUser();
@@ -35,10 +41,12 @@ export default function ProfileScreen() {
   const supabase = useSupabaseClient();
   const { userData, loading: analyticsLoading, error: analyticsError, updateInterests, refetch } = useUserAnalytics();
   const { tagObjects, loading: tagsLoading } = useTags();
+  const { trackAction } = useTrackSession();
   const [isEditingInterests, setIsEditingInterests] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [tempName, setTempName] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [currencyContext, setCurrencyContext] = useState<CurrencyContext | null>(null);
   const router = useRouter();
   const { t, language } = useLanguage();
   const { showAlert, showToast } = useAlert();
@@ -51,6 +59,37 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  React.useEffect(() => {
+    let active = true;
+    const loadCurrency = async () => {
+      if (!userData?.currency_code) {
+        setCurrencyContext(null);
+        return;
+      }
+      const info = await getCurrencyInfo(supabase, userData.currency_code);
+      if (!active) return;
+      if (info) {
+        setCurrencyContext({
+          userCurrencyCode: info.code,
+          userCurrency: info,
+          currencyByCode: { [info.code]: info },
+          rateToUserByCode: { [info.code]: 1 },
+        });
+      } else {
+        setCurrencyContext(null);
+      }
+    };
+    loadCurrency();
+    return () => {
+      active = false;
+    };
+  }, [userData?.currency_code, supabase]);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    trackAction("profile_view", { userId: user.id });
+  }, [user?.id, trackAction]);
+
   const toggleInterest = async (tagName: string) => {
     try {
       const currentInterests = userData?.interested_tags || [];
@@ -61,6 +100,10 @@ export default function ProfileScreen() {
         newInterests = [...currentInterests, tagName];
       }
       await updateInterests(newInterests);
+      trackAction("tag_select", {
+        tagName,
+        selected: !currentInterests.includes(tagName),
+      });
     } catch (error) {
        showAlert({
          title: t("profile_update_failed"),
@@ -111,6 +154,7 @@ export default function ProfileScreen() {
         message: t("profile_update_success"),
         type: 'success',
       });
+      trackAction("profile_update", { userId: user.id, field: "name" });
     } catch (error) {
       console.error("Error updating profile:", error);
       showAlert({
@@ -222,6 +266,9 @@ export default function ProfileScreen() {
             type: 'success',
           });
         }
+        if (user?.id) {
+          trackAction("profile_update", { userId: user.id, field: "image_url" });
+        }
       }
     } catch (error: any) {
       console.error("Error updating profile image:", error);
@@ -319,12 +366,24 @@ export default function ProfileScreen() {
       <View style={styles.statsContainer}>
         <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.statCard}>
           <Text style={styles.statLabel}>{t("profile_total_spend")}</Text>
-          <Text style={styles.statValue}>${userData?.total_spend?.toFixed(2) || '0.00'}</Text>
+          <Text style={styles.statValue}>
+            {formatCurrencyAmount(userData?.total_spend || 0, {
+              currencyCode: currencyContext?.userCurrencyCode || userData?.currency_code,
+              language,
+              currencyContext,
+            })}
+          </Text>
         </Animated.View>
         <View style={styles.statSeparator} />
         <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.statCard}>
           <Text style={styles.statLabel}>{t("profile_total_revenue")}</Text>
-          <Text style={styles.statValue}>${userData?.total_revenue?.toFixed(2) || '0.00'}</Text>
+          <Text style={styles.statValue}>
+            {formatCurrencyAmount(userData?.total_revenue || 0, {
+              currencyCode: currencyContext?.userCurrencyCode || userData?.currency_code,
+              language,
+              currencyContext,
+            })}
+          </Text>
         </Animated.View>
         {PROMOTIONS_ENABLED && (
           <>
@@ -411,12 +470,13 @@ export default function ProfileScreen() {
         >
           <Ionicons name="settings-outline" size={24} color={Colors.white} />
           <Text style={styles.menuItemText}>{t("profile_settings")}</Text>
-          <Ionicons name={language === 'ar' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
+          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
+        
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="help-circle-outline" size={24} color={Colors.white} />
           <Text style={styles.menuItemText}>{t("profile_support")}</Text>
-          <Ionicons name={language === 'ar' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
+          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </Animated.View>
 

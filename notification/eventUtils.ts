@@ -82,7 +82,9 @@ export async function askEventQuestion(
         eventId,
         organizerId,
         data.id,
+        userId,
         askerData.name || "Someone",
+        question,
       );
     }
 

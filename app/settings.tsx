@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -15,18 +16,13 @@ import { Colors } from "../src/constants/Colors";
 import { Fonts } from "../src/constants/Fonts";
 import { useAlert } from "../src/lib/AlertContext";
 import { useLanguage } from "../src/lib/i18n";
-import { useSupabaseClient } from "../src/lib/supabaseConfig";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useUser();
-  const supabase = useSupabaseClient();
   const { language, setLanguage, t } = useLanguage();
   const { signOut } = useAuth();
   const { showAlert } = useAlert();
-
-
-
 
   const handleSignOut = () => {
     showAlert({
@@ -56,7 +52,7 @@ export default function SettingsScreen() {
     });
   };
 
-  const handleChangeLanguage = async (lang: "en" | "ar") => {
+  const handleChangeLanguage = async (lang: "en" | "ar" | "ar-EG") => {
     await setLanguage(lang);
   };
 
@@ -65,7 +61,7 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons
-            name={language === "ar" ? "chevron-forward" : "chevron-back"}
+            name={language === "ar" || language === "ar-EG" ? "chevron-forward" : "chevron-back"}
             size={28}
             color={Colors.white}
           />
@@ -74,7 +70,7 @@ export default function SettingsScreen() {
         <View style={{ width: 28 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>{t("settings_language")}</Text>
         <Text style={styles.sectionDescription}>
           {t("settings_language_description")}
@@ -114,6 +110,23 @@ export default function SettingsScreen() {
               {t("settings_language_ar")}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              language === "ar-EG" && styles.languageOptionActive,
+            ]}
+            onPress={() => handleChangeLanguage("ar-EG")}
+          >
+            <Text
+              style={[
+                styles.languageOptionText,
+                language === "ar-EG" && styles.languageOptionTextActive,
+              ]}
+            >
+              {t("settings_language_ar_eg")}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.noteText}>
@@ -126,7 +139,7 @@ export default function SettingsScreen() {
           <Ionicons name="log-out-outline" size={24} color={Colors.error} />
           <Text style={styles.signOutText}>{t("settings_sign_out")}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -216,6 +229,4 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     marginLeft: 8,
   },
-
 });
-

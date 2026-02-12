@@ -17,12 +17,13 @@ import { TagsBar } from "../../src/components/TagsBar";
 import { TopBar } from "../../src/components/TopBar";
 import { Colors } from "../../src/constants/Colors";
 import { Fonts } from "../../src/constants/Fonts";
-import { useEvents } from "../../src/hooks/useEvents";
+import { useEvents, useTags } from "../../src/hooks/useEvents";
 import { useTrackSession } from "../../src/hooks/useTrackSession";
 import { useUserAnalytics } from "../../src/hooks/useUserAnalytics";
 import { useAlert } from "../../src/lib/AlertContext";
 import { useLanguage } from "../../src/lib/i18n";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
+import { autoDetectAndUpdateUserCurrency } from "../../src/utils/currency";
 
 // getDistance utility is now imported from ../../src/utils/location
 import { getDistance } from "../../src/utils/location";
@@ -39,6 +40,9 @@ export default function HomeScreen() {
   const nearMeLabel = useMemo(() => t("location_near_me") || "Near me", [t]);
   const [activeTag, setActiveTag] = useState(allTagLabel);
   const [userCity, setUserCity] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   
   // Sync active tag is "All" when language changes
   useEffect(() => {
@@ -67,6 +71,80 @@ export default function HomeScreen() {
   );
 
   const { events, loading, error, refetch } = useEvents(fetchOptions);
+  const { tags, tagObjects } = useTags();
+
+  // Filter tags to only show those that have events
+  const availableTags = useMemo(() => {
+    if (!tags || tags.length === 0) return [];
+    
+    // Always keep "All" and "Near me"
+    const staticTags = [allTagLabel, nearMeLabel];
+    
+    // Get all tags that actually exist in the current events
+    const existingTags = new Set<string>();
+    events.forEach(event => {
+      event.tags?.forEach(tag => {
+        if (tag) existingTags.add(tag.trim().toLowerCase());
+      });
+    });
+
+    return tags.filter(tag => {
+      if (!tag) return false;
+      const normalizedTag = tag.trim().toLowerCase();
+      // Check if it's one of our static labels (All, Near me)
+      if (allTagLabel.trim().toLowerCase() === normalizedTag || nearMeLabel.trim().toLowerCase() === normalizedTag) return true;
+      // Check if any active event has this tag
+      return existingTags.has(normalizedTag);
+    });
+  }, [tags, events, allTagLabel, nearMeLabel]);
+
+  useEffect(() => {
+    if (!loading) {
+      setHasLoadedOnce(true);
+    }
+  }, [loading]);
+
+  // Function to update location in database and handle currency
+  const updateLocationInDatabase = useCallback(async (location: Location.LocationObject) => {
+    if (!user?.id) return;
+
+    try {
+      console.log("📍 Updating location in DB...");
+      const [address] = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+      });
+      console.log("📍 Address detected:", JSON.stringify(address));
+      
+      const locationString = address ? `${address.city || ''}, ${address.country || ''}` : `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`;
+
+      if (address && address.city) {
+          setUserCity(address.city);
+      }
+
+      await supabase.from('users').update({ 
+          last_location: locationString,
+          country_code: address?.isoCountryCode || null,
+      }).eq('id', user.id);
+
+      if (address?.isoCountryCode && !userData?.currency_code) {
+        console.log("💰 Auto-detecting currency for country:", address.isoCountryCode);
+        const detectedCode = await autoDetectAndUpdateUserCurrency(
+          supabase,
+          user.id,
+          address.isoCountryCode,
+        );
+        console.log("💰 Detected currency:", detectedCode);
+      }
+
+      // Always refetch to ensure we have the latest user state (including currency)
+      console.log("🔄 Refetching events to apply updates...");
+      await refetch();
+      
+    } catch (err) {
+      console.warn("⚠️ Error updating location/currency:", err);
+    }
+  }, [user?.id, supabase, refetch]);
 
   // Function to handle location button press
   const handleLocationPress = React.useCallback(async () => {
@@ -79,6 +157,9 @@ export default function HomeScreen() {
         });
         setUserLocation(location);
         setActiveTag(nearMeLabel);
+        
+        // Update DB and currency
+        await updateLocationInDatabase(location);
       } else {
         showAlert({
           title: t("location_settings_title") || "Location Access",
@@ -94,12 +175,27 @@ export default function HomeScreen() {
         type: 'error',
       });
     }
-  }, [trackAction, nearMeLabel, showAlert, t]);
+  }, [trackAction, nearMeLabel, showAlert, t, updateLocationInDatabase]);
 
   const onSearchChange = React.useCallback(() => {}, []);
-  const onTagPress = React.useCallback((tag: string) => setActiveTag(tag), []);
+  const onTagPress = React.useCallback((tag: string) => {
+    if (tag === nearMeLabel) {
+      if (!userLocation) {
+        handleLocationPress();
+        return;
+      }
+    }
+    setActiveTag(tag);
+    
+    // Find tag ID for better tracking
+    const tagObj = tagObjects?.find(t => t.name === tag || t.label === tag);
+    trackAction("tag_select", { 
+        tagName: tag,
+        tagId: tagObj?.id 
+    });
+  }, [nearMeLabel, userLocation, handleLocationPress, trackAction, tagObjects]);
 
-  const checkLocationPermission = async () => {
+  const checkLocationPermission = useCallback(async () => {
     try {
       // Check existing permissions first
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
@@ -118,25 +214,14 @@ export default function HomeScreen() {
             accuracy: Location.Accuracy.High,
           });
           setUserLocation(location);
-          setActiveTag(nearMeLabel);
+          
+          // DO NOT explicitly set active tag here automatically
+          // This prevents the "jumping" behavior the user described
+          // setActiveTag(nearMeLabel);
 
           // Update user last_location in Supabase
-          if (user?.id) {
-            const [address] = await Location.reverseGeocodeAsync({
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-            });
-            
-            const locationString = address ? `${address.city || ''}, ${address.country || ''}` : `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`;
+          await updateLocationInDatabase(location);
 
-            if (address && address.city) {
-                setUserCity(address.city);
-            }
-
-            await supabase.from('users').update({ 
-                last_location: locationString 
-            }).eq('id', user.id);
-          }
         } catch (posError) {
           // Silently ignore position errors (e.g. timeout or location disabled)
         }
@@ -144,16 +229,38 @@ export default function HomeScreen() {
     } catch (error) {
       // Silently ignore permission request errors
     }
-  };
+  }, [updateLocationInDatabase]);
 
-  // Request location on mount
+  // Request location on mount and when user changes
   useEffect(() => {
     checkLocationPermission();
+  }, [user?.id]); // Only re-run when user changes, not on every fetch update
+
+  const getEventKey = useCallback((event: any) => {
+    return (
+      event.id ||
+      [
+        event.title || "",
+        event.rawDate || "",
+        event.time || "",
+        (event.location || "").toLowerCase(),
+      ].join("|")
+    );
   }, []);
+
+  const uniqueEvents = useMemo(() => {
+    const seen = new Set<string>();
+    return events.filter((event) => {
+      const key = getEventKey(event);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [events, getEventKey]);
 
   // Filter events based on selected tag and search query
   const filteredEvents = useMemo(() => {
-    let result = events;
+    let result = uniqueEvents;
 
     // Filter by "Near me"
     if (activeTag === nearMeLabel) {
@@ -190,7 +297,18 @@ export default function HomeScreen() {
     }
 
     return result;
-  }, [events, activeTag, userLocation]);
+  }, [uniqueEvents, activeTag, userLocation]);
+
+  // Final de-dup pass for Home feed (prevents repeated cards)
+  const uniqueFilteredEvents = useMemo(() => {
+    const seen = new Set<string>();
+    return filteredEvents.filter((event) => {
+      const key = getEventKey(event);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [filteredEvents, getEventKey]);
 
   // ==========================================
   // SMART RECOMMENDATION ALGORITHM
@@ -202,8 +320,14 @@ export default function HomeScreen() {
 
   // Update rotation counter on refresh
   const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
     setRotationCounter(prev => prev + 1);
-    await refetch();
+    setRefreshCounter(prev => prev + 1);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refetch]);
 
   // 1. Calculate all possible recommendation sections with quality scores
@@ -213,20 +337,19 @@ export default function HomeScreen() {
       title: string;
       events: any[];
       score: number; // Higher = better quality/relevance
-      component: React.ReactNode;
     }> = [];
 
     // Get IDs of events already in the main feed to avoid duplicates
-    const mainFeedEventIds = new Set(filteredEvents.map(e => e.id));
+    const mainFeedEventKeys = new Set(uniqueFilteredEvents.map(e => getEventKey(e)));
     
     // Helper to filter out events already in main feed
     const filterUnique = (eventList: any[]) => 
-      eventList.filter(e => !mainFeedEventIds.has(e.id));
+      eventList.filter(e => !mainFeedEventKeys.has(getEventKey(e)));
 
     // CANDIDATE 1: Popular in User's City
     if (userCity) {
       const cityEvents = filterUnique(
-        events.filter(event => event.location.toLowerCase().includes(userCity.toLowerCase()))
+        uniqueEvents.filter(event => event.location.toLowerCase().includes(userCity.toLowerCase()))
       ).slice(0, 5);
       
       if (cityEvents.length >= 3) { // Minimum 3 events to show
@@ -235,13 +358,6 @@ export default function HomeScreen() {
           title: `${t('home_featured_popular')} ${userCity}`,
           events: cityEvents,
           score: 100 + cityEvents.length * 5, // Base 100 + bonus for more events
-          component: (
-            <HorizontalEventList 
-              key="popular"
-              title={`${t('home_featured_popular')} ${userCity}`} 
-              events={cityEvents} 
-            />
-          )
         });
       }
     }
@@ -253,9 +369,12 @@ export default function HomeScreen() {
       let bestInterest: { tag: string; events: any[] } | null = null;
       
       for (const interest of interests) {
+        // Find the label for this interest (interest is name/id)
+        const label = tagObjects.find(t => t.name === interest)?.label || interest;
+        
         const filtered = filterUnique(
-          events.filter(event => 
-            event.tags?.some(tag => tag.toLowerCase() === interest.toLowerCase())
+          uniqueEvents.filter(event => 
+            event.tags?.some(tag => tag.toLowerCase() === label.toLowerCase())
           )
         );
         
@@ -272,20 +391,13 @@ export default function HomeScreen() {
           title: `${t('home_featured_interested')} ${bestInterest.tag}`,
           events: bestInterest.events,
           score: 90 + bestInterest.events.length * 8, // Slightly lower base, but high bonus
-          component: (
-            <HorizontalEventList 
-              key="interests"
-              title={`${t('home_featured_interested')} ${bestInterest.tag}`} 
-              events={bestInterest.events} 
-            />
-          )
         });
       }
     }
 
     // CANDIDATE 3: Nearby Events (if location available)
-    if (userLocation && events.length > 0) {
-      const nearbyEvents = filterUnique(events)
+    if (userLocation && uniqueEvents.length > 0) {
+      const nearbyEvents = filterUnique(uniqueEvents)
         .map(event => {
           const hasCoords = event.latitude !== null && event.latitude !== undefined && 
                            event.longitude !== null && event.longitude !== undefined;
@@ -312,19 +424,12 @@ export default function HomeScreen() {
           title: t("home_nearby"),
           events: nearbyEvents,
           score: 85 + nearbyEvents.length * 6,
-          component: (
-            <HorizontalEventList 
-              key="nearby"
-              title={t("home_nearby")} 
-              events={nearbyEvents} 
-            />
-          )
         });
       }
     }
 
     // CANDIDATE 4: Trending Events (high attendance growth)
-    const trendingEvents = filterUnique(events)
+    const trendingEvents = filterUnique(uniqueEvents)
       .filter(event => event.attendingCount >= 5)
       .sort((a, b) => b.attendingCount - a.attendingCount)
       .slice(0, 5);
@@ -335,36 +440,22 @@ export default function HomeScreen() {
         title: t("home_trending"),
         events: trendingEvents,
         score: 70 + trendingEvents.length * 4,
-        component: (
-          <HorizontalEventList 
-            key="trending"
-            title={t("home_trending")} 
-            events={trendingEvents} 
-          />
-        )
       });
     }
 
     // CANDIDATE 5: Suggested for You (Fallback - always available)
-    const suggestedEvents = filterUnique(events).slice(0, 5);
+    const suggestedEvents = filterUnique(uniqueEvents).slice(0, 5);
     if (suggestedEvents.length >= 3) {
       candidates.push({
         type: 'suggested',
         title: t('home_featured_suggested'),
         events: suggestedEvents,
         score: 50 + suggestedEvents.length * 2, // Lowest priority
-        component: (
-          <HorizontalEventList 
-            key="suggested"
-            title={t('home_featured_suggested')} 
-            events={suggestedEvents} 
-          />
-        )
       });
     }
 
     return candidates;
-  }, [events, filteredEvents, userCity, userData?.interested_tags, userLocation, language, t]);
+  }, [uniqueEvents, uniqueFilteredEvents, userCity, userData?.interested_tags, userLocation, language, t, getEventKey]);
 
   // 2. SELECT THE BEST RECOMMENDATION
   // Algorithm: Sort by score, then cycle through top candidates on each refresh
@@ -387,15 +478,16 @@ export default function HomeScreen() {
   // 3. CREATE MIXED FEED (90% Event Cards + 10% Horizontal Lists)
   // Inject HorizontalEventList sections between regular event cards
   const mixedFeedData = useMemo(() => {
-    if (filteredEvents.length === 0) return [];
+    if (uniqueFilteredEvents.length === 0) return [];
 
     const feed: Array<{ type: 'event' | 'recommendation'; data: any; id: string }> = [];
+    const usedEventKeys = new Set(uniqueFilteredEvents.map((event) => getEventKey(event)));
     
     // Insert recommendation sections at strategic positions
     // Strategy: Insert after every ~10 events (10% ratio)
     const insertInterval = 10;
     
-    filteredEvents.forEach((event, index) => {
+    uniqueFilteredEvents.forEach((event, index) => {
       // Add the regular event card
       feed.push({
         type: 'event',
@@ -409,17 +501,23 @@ export default function HomeScreen() {
         // Cycle through different recommendations for variety
         const recIndex = Math.floor(index / insertInterval) % recommendationCandidates.length;
         const recommendation = recommendationCandidates[recIndex] || selectedRecommendation;
-        
-        feed.push({
-          type: 'recommendation',
-          data: recommendation,
-          id: `recommendation-${index}-${recommendation.type}`
-        });
+        const uniqueRecEvents = recommendation.events.filter(
+          (recEvent) => !usedEventKeys.has(getEventKey(recEvent))
+        );
+
+        if (uniqueRecEvents.length >= 3) {
+          uniqueRecEvents.forEach((recEvent) => usedEventKeys.add(getEventKey(recEvent)));
+          feed.push({
+            type: 'recommendation',
+            data: { ...recommendation, events: uniqueRecEvents },
+            id: `recommendation-${index}-${recommendation.type}`
+          });
+        }
       }
     });
 
     return feed;
-  }, [filteredEvents, selectedRecommendation, recommendationCandidates]);
+  }, [uniqueFilteredEvents, selectedRecommendation, recommendationCandidates, getEventKey]);
 
   const renderMixedItem = useCallback(({ item, index }: { item: any; index: number }) => {
     if (item.type === 'event') {
@@ -431,7 +529,10 @@ export default function HomeScreen() {
     } else if (item.type === 'recommendation') {
       return (
         <View style={styles.recommendationContainer}>
-          {item.data.component}
+          <HorizontalEventList 
+            title={item.data.title} 
+            events={item.data.events} 
+          />
         </View>
       );
     }
@@ -439,6 +540,23 @@ export default function HomeScreen() {
   }, []);
 
   const keyExtractorMixed = useCallback((item: any) => item.id, []);
+  const skeletonData = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${i}` })),
+    [],
+  );
+
+  const renderSkeletonItem = useCallback(() => {
+    return (
+      <View style={styles.cardContainer}>
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonImage} />
+          <View style={styles.skeletonLineWide} />
+          <View style={styles.skeletonLineMedium} />
+          <View style={styles.skeletonLineShort} />
+        </View>
+      </View>
+    );
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right"]}>
@@ -457,11 +575,17 @@ export default function HomeScreen() {
           searchQuery=""
           onSearchChange={onSearchChange}
           onLocationPress={handleLocationPress}
+          refreshToken={refreshCounter}
         />
-        <TagsBar activeTag={activeTag} onTagPress={onTagPress} />
+        <TagsBar
+          activeTag={activeTag}
+          onTagPress={onTagPress}
+          refreshToken={refreshCounter}
+          tags={availableTags}
+        />
       </Animated.View>
 
-      {loading ? (
+      {loading && !hasLoadedOnce ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -477,6 +601,24 @@ export default function HomeScreen() {
               : `${t("home_no_events_tag")} "${activeTag}"`}
           </Text>
         </View>
+      ) : isRefreshing ? (
+        <Animated.FlatList
+          data={skeletonData}
+          renderItem={renderSkeletonItem}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          windowSize={5}
+          maxToRenderPerBatch={10}
+          removeClippedSubviews={true}
+          contentContainerStyle={[
+            styles.listContent,
+            { 
+              paddingTop: insets.top + 180, // Safe area + Header height
+              paddingBottom: insets.bottom + 120 
+            }
+          ]}
+        />
       ) : (
         <Animated.FlatList
           data={mixedFeedData}
@@ -496,10 +638,11 @@ export default function HomeScreen() {
           ]}
           refreshControl={
             <RefreshControl
-              refreshing={loading}
+              refreshing={isRefreshing}
               onRefresh={handleRefresh}
               tintColor={Colors.primary}
               titleColor={Colors.primary}
+              progressViewOffset={insets.top + 180}
             />
           }
           // onScroll removed to disable animation drive
@@ -577,5 +720,37 @@ const styles = StyleSheet.create({
   recommendationContainer: {
     marginTop: 5,
     marginBottom: 10,
+  },
+  skeletonCard: {
+    backgroundColor: '#171717',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  skeletonImage: {
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#232323',
+    marginBottom: 12,
+  },
+  skeletonLineWide: {
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: '#232323',
+    marginBottom: 8,
+    width: '85%',
+  },
+  skeletonLineMedium: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: '#232323',
+    marginBottom: 8,
+    width: '65%',
+  },
+  skeletonLineShort: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: '#232323',
+    width: '45%',
   },
 });

@@ -10,6 +10,11 @@ const MessageBubble = memo(({ item }: { item: ConversationMessage }) => {
   const isMe = item.fromMe;
   // TODO: Check if type 'event_link' is correct based on DB
   const isLink = item.type === 'event_link';
+  const subjectText = item.subject?.trim() || "";
+  const isNewQuestionSubject =
+    subjectText.toLowerCase() === "new question" || subjectText === "سؤال جديد";
+  const displaySubject =
+    isNewQuestionSubject && item.eventTitle ? item.eventTitle : item.subject;
 
   if (isLink) {
       return (
@@ -43,14 +48,26 @@ const MessageBubble = memo(({ item }: { item: ConversationMessage }) => {
         isMe ? styles.messageRowMe : styles.messageRowOther,
       ]}
     >
+      {!!displaySubject && item.type === "general" && (
+        <View
+          style={[
+            styles.subjectPill,
+            isMe ? styles.subjectPillMe : styles.subjectPillOther,
+          ]}
+        >
+          <Text style={styles.subjectText} numberOfLines={1}>
+            {displaySubject}
+          </Text>
+        </View>
+      )}
       <View
         style={[
           styles.messageBubble,
           isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
         ]}
       >
-        <Text style={styles.messageText}>{item.text}</Text>
-        <Text style={styles.messageTime}>{item.time}</Text>
+        <Text style={[styles.messageText, isMe && styles.messageTextMe]}>{item.text}</Text>
+        <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>{item.time}</Text>
       </View>
     </View>
   );
@@ -59,23 +76,23 @@ const MessageBubble = memo(({ item }: { item: ConversationMessage }) => {
 const styles = StyleSheet.create({
   messageRow: {
     marginBottom: 16,
-    flexDirection: "row",
-    alignItems: 'flex-end',
+    flexDirection: "column",
+    alignItems: "flex-start",
   },
   messageRowMe: {
-    justifyContent: "flex-end",
+    alignItems: "flex-end",
   },
   messageRowOther: {
-    justifyContent: "flex-start",
+    alignItems: "flex-start",
   },
   messageBubble: {
-    maxWidth: "80%",
+    maxWidth: "75%",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   messageBubbleMe: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.white,
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
@@ -88,12 +105,40 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     lineHeight: 24,
   },
+  messageTextMe: {
+    color: Colors.black,
+  },
   messageTime: {
     alignSelf: "flex-end",
     color: Colors.whiteTransparentHigh,
     fontSize: 10,
     fontFamily: Fonts.regular,
     marginTop: 4,
+  },
+  messageTimeMe: {
+    color: Colors.blackTransparentMedium,
+  },
+  subjectPill: {
+    maxWidth: "75%",
+    backgroundColor: Colors.darkflame,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  subjectPillMe: {
+    alignSelf: "flex-end",
+    borderBottomRightRadius: 6,
+  },
+  subjectPillOther: {
+    alignSelf: "flex-start",
+    borderBottomLeftRadius: 6,
+  },
+  subjectText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontFamily: Fonts.medium,
+    fontStyle: "italic",
   },
   // Link Bubble Styles
   linkBubble: {
@@ -102,6 +147,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     minWidth: 200,
+    maxWidth: "75%",
   },
   linkContent: {
       marginTop: 0,

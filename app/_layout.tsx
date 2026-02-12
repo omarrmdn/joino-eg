@@ -4,27 +4,29 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { PostHogProvider } from "posthog-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { withStallion } from "react-native-stallion";
 import 'react-native-url-polyfill/auto';
+import { NotificationProvider } from "../notification/NotificationProvider";
 import Applogo from "../src/components/applogo";
 import { Colors } from "../src/constants/Colors";
+import { useTrackSession } from "../src/hooks/useTrackSession";
 import { AlertProvider } from "../src/lib/AlertContext";
 import { tokenCache } from "../src/lib/cache";
 import { LanguageProvider } from "../src/lib/i18n";
 import OnboardingScreen from "./Onboarding";
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
 if (!publishableKey) {
-  throw new Error(
-    "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env"
+  console.error(
+    "❌ [Critical] Missing Clerk Publishable Key. The app will not be able to authenticate users."
   );
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootLayout() {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -44,10 +46,12 @@ function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
+        console.log("🚀 [RootLayout] Preparing app...");
         const onboardingDone = await AsyncStorage.getItem('onboardingDone');
         setShowOnboarding(onboardingDone !== 'true');
+        console.log("🚀 [RootLayout] Onboarding state:", onboardingDone !== 'true');
       } catch (e) {
-        console.warn('Failed to load onboarding state:', e);
+        console.warn('🚀 [RootLayout] Failed to load onboarding state:', e);
         setShowOnboarding(true); // Fallback
       }
     }
@@ -55,14 +59,66 @@ function RootLayout() {
   }, []);
 
   useEffect(() => {
+    if (error) {
+      console.error("🚀 [RootLayout] Font loading error:", error);
+    }
+    
     if ((loaded || error) && showOnboarding !== null) {
-      const timer = setTimeout(() => {
-        setAppIsReady(true);
-        SplashScreen.hideAsync();
-      }, 1000);
+      console.log("🚀 [RootLayout] Assets loaded. Ready to hide splash.");
+      const timer = setTimeout(async () => {
+        try {
+          setAppIsReady(true);
+          await SplashScreen.hideAsync();
+          console.log("🚀 [RootLayout] Splash screen hidden.");
+        } catch (e) {
+          console.warn("🚀 [RootLayout] Error hiding splash status:", e);
+        }
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [loaded, error, showOnboarding]);
+
+  // Fail-safe: Hide splash screen after 5 seconds no matter what
+  useEffect(() => {
+    const backupTimer = setTimeout(async () => {
+      if (!appIsReady) {
+        console.warn("🚀 [RootLayout] Fail-safe: Forcing app is ready after timeout.");
+        setAppIsReady(true);
+        try {
+          await SplashScreen.hideAsync();
+        } catch (e) {}
+      }
+    }, 5000);
+    return () => clearTimeout(backupTimer);
+  }, [appIsReady]);
+
+  if (!publishableKey) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Applogo width={100} height={100} />
+        <View style={{ height: 40 }} />
+        <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', padding: 15, borderRadius: 10 }}>
+            <View style={{ alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#FFD700', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
+                    <View style={{ width: 4, height: 15, backgroundColor: 'black', borderRadius: 2 }} />
+                    <View style={{ width: 4, height: 4, backgroundColor: 'black', borderRadius: 2, marginTop: 2 }} />
+                </View>
+                <View style={{ height: 2 }} />
+            </View>
+            <View style={{ alignItems: 'center' }}>
+                <View style={{ backgroundColor: 'white', padding: 10, borderRadius: 5 }}>
+                    <View style={{ alignItems: 'center' }}>
+                        <View style={{ width: 200 }}>
+                            <View style={{ height: 10, backgroundColor: '#eee', borderRadius: 5, width: '100%' }} />
+                            <View style={{ height: 10, backgroundColor: '#eee', borderRadius: 5, width: '80%', marginTop: 5 }} />
+                        </View>
+                    </View>
+                </View>
+            </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
@@ -80,13 +136,15 @@ function RootLayout() {
           }}
         >
           <LanguageProvider>
-            <AlertProvider>
-              <RootContent 
-                appIsReady={appIsReady} 
-                showOnboarding={showOnboarding} 
-                setShowOnboarding={setShowOnboarding}
-              />
-            </AlertProvider>
+            <NotificationProvider>
+              <AlertProvider>
+                <RootContent 
+                  appIsReady={appIsReady} 
+                  showOnboarding={showOnboarding} 
+                  setShowOnboarding={setShowOnboarding}
+                />
+              </AlertProvider>
+            </NotificationProvider>
           </LanguageProvider>
         </PostHogProvider>
       </ClerkLoaded>
@@ -102,11 +160,34 @@ interface RootContentProps {
 
 const RootContent = ({ appIsReady, showOnboarding, setShowOnboarding }: RootContentProps) => {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { trackAction } = useTrackSession();
+  const prevSignedInRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (appIsReady) {
+      trackAction("app_open");
+    }
+  }, [appIsReady, trackAction]);
+
+  useEffect(() => {
+    if (!authLoaded) return;
+    
+    if (prevSignedInRef.current === null) {
+      prevSignedInRef.current = isSignedIn ?? null;
+      return;
+    }
+    if (isSignedIn && !prevSignedInRef.current) {
+      trackAction("login");
+    } else if (!isSignedIn && prevSignedInRef.current) {
+      trackAction("logout");
+    }
+    prevSignedInRef.current = isSignedIn ?? null;
+  }, [isSignedIn, authLoaded, trackAction]);
   
   if (showOnboarding === null || !appIsReady || !authLoaded) {
     return (
       <View style={styles.splashContainer}>
-        <Applogo width={200} height={200} />
+        <Applogo width={160} height={160} />
       </View>
     );
   }
@@ -135,4 +216,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withStallion(RootLayout);
+export default RootLayout;
+

@@ -31,6 +31,7 @@ export const SearchResult = React.memo(({ event, index = 0, onRefresh }: SearchR
     event.recurrencePattern,
     event.recurrenceDays,
     language,
+    t,
   );
   const dateLabel = recurringLabel || event.day;
   const scale = useSharedValue(1);
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   infoItem: {
-    flex: 1,
+    width: "50%",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -215,6 +216,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12, // Slightly smaller
     fontFamily: Fonts.medium,
+    flex: 1,
   },
   footerRow: {
     flexDirection: "row",

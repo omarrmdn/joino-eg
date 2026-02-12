@@ -2,6 +2,7 @@
 import { useUser } from "@clerk/clerk-expo";
 import { useEffect } from "react";
 import { useSupabaseClient } from "../lib/supabaseConfig";
+import { autoDetectAndUpdateUserCurrency, getCountryCodeFromLocale } from "../utils/currency";
 
 export function useSupabaseSync() {
   const { user, isLoaded } = useUser();
@@ -51,6 +52,18 @@ export function useSupabaseSync() {
         console.log("Supabase Sync Success!");
       } catch (error) {
         console.error("Supabase Sync Error:", error);
+      }
+
+      try {
+        if (user?.id) {
+          await autoDetectAndUpdateUserCurrency(
+            supabase,
+            user.id,
+            getCountryCodeFromLocale(),
+          );
+        }
+      } catch (currencyError) {
+        console.warn("Currency auto-detect failed:", currencyError);
       }
 
       // Initialize notification preferences if they don't exist

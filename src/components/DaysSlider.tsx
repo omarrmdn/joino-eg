@@ -17,7 +17,8 @@ interface DaysSliderProps {
 }
 
 export const DaysSlider = ({ selectedDate, onDateSelect, availableDates }: DaysSliderProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const locale = language?.startsWith('ar') ? 'ar-EG' : 'en-US';
   
   const days: Day[] = availableDates.map((dateStr) => {
     const d = new Date(dateStr);
@@ -30,7 +31,7 @@ export const DaysSlider = ({ selectedDate, onDateSelect, availableDates }: DaysS
     return {
       date: dateStr,
       dayNum: d.getDate().toString(),
-      dayName: isToday ? t('today') : d.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayName: isToday ? t('today') : d.toLocaleDateString(locale, { weekday: 'short' }),
     };
   });
 
