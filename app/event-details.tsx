@@ -28,7 +28,7 @@ import { useAlert } from "../src/lib/AlertContext";
 import { TranslationKey, useLanguage } from "../src/lib/i18n";
 import { notificationManager } from "../src/lib/NotificationManager";
 import { useSupabaseClient } from "../src/lib/supabaseConfig";
-// import { parseCurrencyNumber } from "../src/utils/currency";
+import { parseCurrencyNumber } from "../src/utils/currency";
 import { formatEventDateLabel } from "../src/utils/date";
 import { getRecurringLabel } from "../src/utils/recurrence";
 import { shareEvent } from "../src/utils/shareEvent";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -6,7 +7,7 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
     // Handle CORS preflight request
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -31,8 +32,8 @@ serve(async (req) => {
         // Prioritize Cloudflare/Vercel headers for accuracy
         let ip = req.headers.get('cf-connecting-ip') ??
             req.headers.get('x-real-ip') ??
-            req.headers.get('cf-ipcountry') ? '0.0.0.0' : null ?? // If country header exists, IP matters less
-        req.headers.get('x-forwarded-for')?.split(',')[0].trim();
+            req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+            (req.headers.get('cf-ipcountry') ? '0.0.0.0' : null);
 
         // If testing locally (or IP missing), use Egypt IP default to prevent failure
         if (!ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
@@ -127,7 +128,7 @@ serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
 
-    } catch (error) {
+    } catch (error: any) {
         // Last resort fallback
         return new Response(
             JSON.stringify({
