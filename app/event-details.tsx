@@ -35,6 +35,7 @@ import { shareEvent } from "../src/utils/shareEvent";
 
 import {
     notifyAttendeeCancellation,
+    notifyAttendeeCancellationSelf,
     notifyAttendeeEventAccessDetails,
     notifyEventCancellation,
     notifyNewAttendee,
@@ -269,20 +270,12 @@ export default function EventDetailsScreen() {
 
         // Notify organizer
         if (eventData.organizerId) {
-          const { data: organizerData } = await supabase
-            .from("users")
-            .select("name")
-            .eq("id", eventData.organizerId)
-            .single();
-
-          if (organizerData) {
-            await notifyNewAttendee(
-              supabase,
-              eventData.id,
-              eventData.organizerId,
-              user.fullName || "Someone",
-            );
-          }
+          await notifyNewAttendee(
+            supabase,
+            eventData.id,
+            eventData.organizerId,
+            user.fullName || "Someone",
+          );
         }
         
         // Send event access details (online link or onsite location) to the attendee
@@ -361,6 +354,9 @@ export default function EventDetailsScreen() {
           cancellationReason.trim()
         );
       }
+
+      // Notify attendee themselves
+      await notifyAttendeeCancellationSelf(supabase, eventData.id, user.id);
 
       notificationManager.setHasUnreadNotifications(true);
       notificationManager.setHasUnreadEvents(true);

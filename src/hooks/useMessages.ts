@@ -1,5 +1,6 @@
 import { useUser } from '@clerk/clerk-expo';
 import { useCallback, useEffect, useState } from 'react';
+import { notifyNewMessage } from '../../notification/eventNotifications';
 import { notificationManager } from '../lib/NotificationManager';
 import { useSupabaseClient } from '../lib/supabaseConfig';
 import { useTrackSession } from './useTrackSession';
@@ -201,6 +202,18 @@ export function useMessages() {
                 .single();
 
             if (sendError) throw sendError;
+
+            // Send push notification to recipient
+            if (data.recipient_id) {
+                await notifyNewMessage(
+                    supabase,
+                    data.recipient_id,
+                    user?.fullName || "Someone",
+                    data.body,
+                    data.event_id
+                );
+            }
+
             setMessages(prev => [data, ...prev]);
             trackAction('message_send', {
                 messageId: data.id,

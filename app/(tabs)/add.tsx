@@ -67,6 +67,7 @@ export default function AddScreen() {
   const [eventType, setEventType] = useState<EventType>("");
   const [location, setLocation] = useState("");
   const [eventLink, setEventLink] = useState("");
+  const [originalEventLink, setOriginalEventLink] = useState("");
   const [cost, setCost] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -439,6 +440,7 @@ export default function AddScreen() {
         setEventType(typeFromDb);
         setLocation(data.location || "");
         setEventLink(data.link || "");
+        setOriginalEventLink(data.link || "");
         setCost(
           typeof data.price === "number" ? String(data.price) : data.price || "",
         );
@@ -990,6 +992,13 @@ export default function AddScreen() {
 
       setSavedEventId(eventId);
       trackAction(isEditMode ? "edit_event_success" : "create_event_success", { eventId });
+
+      // If online and link changed during edit, notify attendees
+      if (isEditMode && eventId && isOnline && eventLink && eventLink !== originalEventLink) {
+        console.log("Link changed, notifying attendees...");
+        await notifyEventLinkUpdate(supabase, eventId, eventLink);
+      }
+
       resetForm();
         // Promotion disabled - show success instead
         showToast({
@@ -1002,8 +1011,8 @@ export default function AddScreen() {
 
       // Trigger local notification and persist it
       if (!isEditMode) {
-        const notifTitle = t("notification_event_posted_title" as any) || "Event Posted!";
-        const notifBody = t("notification_event_posted_body" as any)?.replace("{title}", title) || `Your event "${title}" is now live.`;
+        const notifTitle = t("notification_event_posted_title");
+        const notifBody = t("notification_event_posted_body").replace("{title}", title);
         
         await notificationService.sendLocalNotification(notifTitle, notifBody, {
           event_id: eventId || undefined,

@@ -175,6 +175,40 @@ export async function notifyAttendeeCancellation(
 }
 
 /**
+ * Notify attendee of their own cancellation success
+ */
+export async function notifyAttendeeCancellationSelf(
+  client: SupabaseClient,
+  eventId: string,
+  attendeeId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: event, error: eventError } = await client
+      .from('events')
+      .select('title')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError) throw eventError;
+
+    const t = await getStaticT();
+    await createNotification(
+      client,
+      attendeeId,
+      'attendee_cancel',
+      t('notification_attendee_cancel_confirmation_title'),
+      t('notification_attendee_cancel_confirmation_body', { title: event.title }),
+      { event_id: eventId, event_title: event.title }
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error notifying self cancellation:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Notify attendees of event reminders
  */
 export async function notifyEventReminder(
@@ -453,6 +487,126 @@ export async function notifyEventCancellation(
     return { success: true, notified };
   } catch (error: any) {
     console.error('Error notifying event cancellation:', error);
+    return { success: false, notified: 0, error: error.message };
+  }
+}
+
+/**
+ * Notify recipient of a new chat message
+ */
+export async function notifyNewMessage(
+  client: SupabaseClient,
+  recipientId: string,
+  senderName: string,
+  messageText: string,
+  eventId?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const t = await getStaticT();
+
+    await createNotification(
+      client,
+      recipientId,
+      'question', // Reusing 'question' type as it maps to messages/chats in UX
+      t('notification_message_title'),
+      t('notification_message_body', { name: senderName, message: messageText }),
+      { event_id: eventId || undefined }
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error notifying new message:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Notify user of event recommendations
+ */
+export async function notifyEventRecommendation(
+  client: SupabaseClient,
+  userId: string,
+  eventId: string,
+  eventTitle: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const t = await getStaticT();
+    await createNotification(
+      client,
+      userId,
+      'recommendation',
+      t('notification_recommendation_title'),
+      t('notification_recommendation_body', { title: eventTitle }),
+      { event_id: eventId, event_title: eventTitle }
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error notifying recommendation:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Notify all attendees when an online event link is updated
+ */
+export async function notifyEventLinkUpdate(
+  client: SupabaseClient,
+  eventId: string,
+  link: string
+): Promise<{ success: boolean; notified: number; error?: string }> {
+  try {
+    const { data: event, error: eventError } = await client
+      .from('events')
+      .select('title, organizer_id')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError) throw eventError;
+
+    const { data: attendees, error: attendeesError } = await client
+      .from('attendees')
+      .select('user_id')
+      .eq('event_id', eventId);
+
+    if (attendeesError) throw attendeesError;
+
+    const t = await getStaticT();
+    const title = t('notification_event_update_title');
+    const body = t('notification_event_update_body_link', { title: event.title });
+
+    let notified = 0;
+    for (const attendee of attendees || []) {
+      // Don't notify organizer
+      if (attendee.user_id === event.organizer_id) continue;
+
+      // 1. Send push/database notification
+      const result = await createNotification(
+        client,
+        attendee.user_id,
+        'event_update',
+        title,
+        body,
+        { event_id: eventId, event_title: event.title, link }
+      );
+
+      // 2. Also send as an inbox message if it succeeds
+      if (result.success) {
+        await client.from('messages').insert({
+          event_id: eventId,
+          sender_id: event.organizer_id,
+          recipient_id: attendee.user_id,
+          message_type: 'event_link',
+          subject: title,
+          body: body,
+          event_link: link,
+        });
+        notified++;
+      }
+    }
+
+    return { success: true, notified };
+  } catch (error: any) {
+    console.error('Error notifying event link update:', error);
     return { success: false, notified: 0, error: error.message };
   }
 }

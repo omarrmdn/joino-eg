@@ -8,7 +8,9 @@ export type NotificationType =
   | 'event_access'
   | 'question'
   | 'new_event'
-  | 'event_stats';
+  | 'event_stats'
+  | 'recommendation'
+  | 'event_update';
 
 export interface Notification {
   id: string;
@@ -68,4 +70,5 @@ export interface PushNotificationData {
   milestone?: number;
   matched_interests?: number;
   cancellation_reason?: string;
+  link?: string;
 }

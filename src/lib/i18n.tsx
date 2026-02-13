@@ -2,16 +2,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import * as Updates from "expo-updates";
 import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from "react";
 import { DevSettings, I18nManager } from "react-native";
 
 import { getGeoInfoByIP } from "../utils/ip";
+import { useSupabaseClient } from "./supabaseConfig";
 
 type Language = "en" | "ar" | "ar-EG";
 
@@ -228,6 +229,12 @@ export type TranslationKey =
   | "notification_answer_body"
   | "notification_nearby_title"
   | "notification_nearby_body"
+  | "notification_message_title"
+  | "notification_message_body"
+  | "notification_recommendation_title"
+  | "notification_recommendation_body"
+  | "notification_event_update_title"
+  | "notification_event_update_body_link"
   | "profile_follow_us"
   | "event_canceled"
   | "event_ended"
@@ -240,6 +247,10 @@ export type TranslationKey =
   | "error_event_ended"
   | "notification_event_canceled_title"
   | "notification_event_canceled_body"
+  | "notification_event_posted_title"
+  | "notification_event_posted_body"
+  | "notification_attendee_cancel_confirmation_title"
+  | "notification_attendee_cancel_confirmation_body"
   | "event_cancel_success"
   | "event_posted_success"
   | "event_updated_success"
@@ -483,6 +494,12 @@ export const translations: Translations = {
     notification_answer_body: "{name} answered your question about \"{title}\"",
     notification_nearby_title: "Event nearby!",
     notification_nearby_body: "\"{title}\" is happening {distance}km from you",
+    notification_message_title: "New message",
+    notification_message_body: "{name} sent you a message: {message}",
+    notification_recommendation_title: "Event you may like",
+    notification_recommendation_body: "We found an event \"{title}\" that matches your interests!",
+    notification_event_update_title: "Event Update",
+    notification_event_update_body_link: "The meeting link for \"{title}\" has been added/updated. Check it in the event details.",
     profile_follow_us: "Follow Us On",
     event_canceled: "Canceled",
     event_ended: "Ended",
@@ -495,6 +512,10 @@ export const translations: Translations = {
     error_event_ended: "This event has already ended.",
     notification_event_canceled_title: "Event Canceled",
     notification_event_canceled_body: "The event \"{title}\" has been canceled. Reason: {reason}",
+    notification_event_posted_title: "Event Posted!",
+    notification_event_posted_body: "Your event \"{title}\" is now live and people can join.",
+    notification_attendee_cancel_confirmation_title: "Attendance Canceled",
+    notification_attendee_cancel_confirmation_body: "You have successfully canceled your attendance for \"{title}\".",
     event_cancel_success: "Event canceled successfully.",
     event_posted_success: "Event posted!",
     event_updated_success: "Event updated!",
@@ -733,6 +754,12 @@ export const translations: Translations = {
     notification_answer_body: "أجاب {name} على سؤالك حول \"{title}\"",
     notification_nearby_title: "فعالية قريبة منك!",
     notification_nearby_body: "تقام \"{title}\" على بعد {distance} كم منك",
+    notification_message_title: "رسالة جديدة",
+    notification_message_body: "أرسل لك {name} رسالة: {message}",
+    notification_recommendation_title: "فعالية قد تعجبك",
+    notification_recommendation_body: "وجدنا فعالية \"{title}\" تناسب اهتماماتك!",
+    notification_event_update_title: "تحديث الفعالية",
+    notification_event_update_body_link: "تمت إضافة/تحديث رابط الاجتماع لفعالية \"{title}\". تحقق منه في تفاصيل الفعالية.",
     profile_follow_us: "تابعنا على",
     event_canceled: "ملغاة",
     event_ended: "منتهية",
@@ -745,6 +772,10 @@ export const translations: Translations = {
     error_event_ended: "لقد انتهت هذه الفعالية بالفعل.",
     notification_event_canceled_title: "تم إلغاء الفعالية",
     notification_event_canceled_body: "تم إلغاء الفعالية \"{title}\". السبب: {reason}",
+    notification_event_posted_title: "تم نشر الفعالية!",
+    notification_event_posted_body: "فعاليتك \"{title}\" هي الآن منشورة ويمكن للناس الانضمام إليها.",
+    notification_attendee_cancel_confirmation_title: "تم إلغاء الحضور",
+    notification_attendee_cancel_confirmation_body: "لقد نجحت في إلغاء حضورك لفعالية \"{title}\".",
     event_cancel_success: "تم إلغاء الفعالية بنجاح.",
     event_posted_success: "تم نشر الفعالية بنجاح",
     event_updated_success: "تم تحديث الفعالية بنجاح",
@@ -983,6 +1014,12 @@ export const translations: Translations = {
     notification_answer_body: "{name} رد على سؤالك عن \"{title}\"",
     notification_nearby_title: "إيفنت قريب منك!",
     notification_nearby_body: "إيفنت \"{title}\" على بعد {distance} كم منك",
+    notification_message_title: "رسالة جديدة",
+    notification_message_body: "{name} بعتلك رسالة: {message}",
+    notification_recommendation_title: "إيفنت هيعجبك",
+    notification_recommendation_body: "لاقينا إيفنت \"{title}\" ممكن يهمك!",
+    notification_event_update_title: "تحديث في الإيفنت",
+    notification_event_update_body_link: "رابط الأونلاين بتاع إيفنت \"{title}\" نزل. تقدر تشوفه دلوقتي.",
     profile_follow_us: "تابعنا على",
     event_canceled: "ملغى",
     event_ended: "خلص",
@@ -995,6 +1032,10 @@ export const translations: Translations = {
     error_event_ended: "الإيفنت ده خلص .",
     notification_event_canceled_title: "الإيفنت اتكنسل",
     notification_event_canceled_body: "إيفنت \"{title}\" اتكنسل. السبب: {reason}",
+    notification_event_posted_title: "الإيفنت نزل!",
+    notification_event_posted_body: "الإيفنت بتاعك \"{title}\" نزل دلوقتي والناس تقدر تحجز.",
+    notification_attendee_cancel_confirmation_title: "تم إلغاء الحجز",
+    notification_attendee_cancel_confirmation_body: "حجزك للإيفنت \"{title}\" اتكنسل بنجاح.",
     event_cancel_success: "تم إلغاء الإيفنت بنجاح.",
     event_posted_success: "الإيفنت اتنشر خلاص!",
     event_updated_success: "تم تحديث الإيفنت!",
@@ -1033,6 +1074,7 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(
 const STORAGE_KEY = "app_language";
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
+  const supabase = useSupabaseClient();
   const [language, setLanguageState] = useState<Language>("en");
   const [hydrated, setHydrated] = useState(false);
   const previousLanguageRef = useRef<Language | null>(null);
@@ -1076,6 +1118,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
     loadLanguage();
   }, []);
+
+  // Sync with Supabase when hydrated or language changes
+  useEffect(() => {
+    if (!hydrated) return;
+    const syncLang = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          await supabase.from("users").update({ language }).eq("id", session.user.id);
+        }
+      } catch (e) {
+        console.warn("[i18n] Language sync error:", e);
+      }
+    };
+    syncLang();
+  }, [hydrated, language]);
 
   // Apply RTL/LTR layout based on selected language and force app reload on change
   useEffect(() => {
@@ -1136,6 +1194,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         try {
           setLanguageState(lang);
           await AsyncStorage.setItem(STORAGE_KEY, lang);
+          
+          // Sync with Supabase if user is logged in
+          const { data: { session } } = await supabase.auth.getSession();
+          const userId = session?.user?.id;
+          if (userId) {
+            await supabase.from("users").update({ language: lang }).eq("id", userId);
+          }
         } catch (e) {
           console.warn("Failed to persist language preference", e);
         }
