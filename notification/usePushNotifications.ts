@@ -59,7 +59,7 @@ export function usePushNotifications() {
 
         // Get Expo push token
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '58b49d48-07b3-405c-9c37-7074bd897968', // Hardcoded from app.json for reliability
+            projectId: '8d20b8c5-e1c1-4380-88ec-4a7706150107', // Match app.json
         });
         const token = tokenData.data;
 
@@ -150,7 +150,7 @@ function handleNotificationTap(data: Record<string, unknown>) {
 export async function unregisterPushToken(supabase: any) {
     try {
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '58b49d48-07b3-405c-9c37-7074bd897968',
+            projectId: '8d20b8c5-e1c1-4380-88ec-4a7706150107',
         }).catch(() => null);
 
         if (!tokenData) return;

@@ -51,6 +51,7 @@ serve(async (req: Request) => {
             data: notification.data || {},
             badge: count || 0,
             priority: 'high',
+            channelId: 'default',
         }));
 
         // 4. Send to Expo
