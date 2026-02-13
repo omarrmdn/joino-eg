@@ -8,12 +8,14 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import 'react-native-url-polyfill/auto';
 import { NotificationProvider } from "../notification/NotificationProvider";
+import { unregisterPushToken, usePushNotifications } from "../notification/usePushNotifications";
 import Applogo from "../src/components/applogo";
 import { Colors } from "../src/constants/Colors";
 import { useTrackSession } from "../src/hooks/useTrackSession";
 import { AlertProvider } from "../src/lib/AlertContext";
 import { tokenCache } from "../src/lib/cache";
 import { LanguageProvider } from "../src/lib/i18n";
+import { useSupabaseClient } from "../src/lib/supabaseConfig";
 import OnboardingScreen from "./Onboarding";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
@@ -160,7 +162,11 @@ interface RootContentProps {
 
 const RootContent = ({ appIsReady, showOnboarding, setShowOnboarding }: RootContentProps) => {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const supabase = useSupabaseClient();
   const { trackAction } = useTrackSession();
+  
+  // Initialize Push Notifications
+  usePushNotifications();
   const prevSignedInRef = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -180,6 +186,7 @@ const RootContent = ({ appIsReady, showOnboarding, setShowOnboarding }: RootCont
       trackAction("login");
     } else if (!isSignedIn && prevSignedInRef.current) {
       trackAction("logout");
+      unregisterPushToken(supabase);
     }
     prevSignedInRef.current = isSignedIn ?? null;
   }, [isSignedIn, authLoaded, trackAction]);
