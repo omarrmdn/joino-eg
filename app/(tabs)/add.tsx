@@ -6,19 +6,20 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import notificationService from "../../notification/notificationService";
 import { Button } from "../../src/components/Button";
 import { PromotedButton } from "../../src/components/PromotedButton";
 import { PromoteEventModal } from "../../src/components/PromoteEventModal";
@@ -33,9 +34,9 @@ import { useLanguage } from "../../src/lib/i18n";
 import { notificationManager } from "../../src/lib/NotificationManager";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
 import {
-  autoDetectAndUpdateUserCurrency,
-  getCountryCodeFromLocale,
-  getCurrencyInfo,
+    autoDetectAndUpdateUserCurrency,
+    getCountryCodeFromLocale,
+    getCurrencyInfo,
 } from "../../src/utils/currency";
 
 type EventType = "online" | "onsite" | "";
@@ -998,6 +999,27 @@ export default function AddScreen() {
           type: "success",
         });
       notificationManager.setHasUnreadEvents(true);
+
+      // Trigger local notification and persist it
+      if (!isEditMode) {
+        const notifTitle = t("notification_event_posted_title" as any) || "Event Posted!";
+        const notifBody = t("notification_event_posted_body" as any)?.replace("{title}", title) || `Your event "${title}" is now live.`;
+        
+        await notificationService.sendLocalNotification(notifTitle, notifBody, {
+          event_id: eventId || undefined,
+        });
+
+        // Persist in DB
+        await supabase.from("notifications").insert({
+          user_id: user.id,
+          type: 'new_event',
+          title: notifTitle,
+          body: notifBody,
+          data: { event_id: eventId },
+          read: false
+        });
+      }
+
       router.replace("/(tabs)");
     } catch (error: any) {
       console.error("Publish Error:", error);

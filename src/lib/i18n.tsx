@@ -2,15 +2,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import * as Updates from "expo-updates";
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 import { DevSettings, I18nManager } from "react-native";
-import { getCountryCodeByIP } from "../utils/ip";
+
+import { getGeoInfoByIP } from "../utils/ip";
 
 type Language = "en" | "ar" | "ar-EG";
 
@@ -92,6 +93,7 @@ export type TranslationKey =
   | "profile_account"
   | "profile_settings"
   | "profile_support"
+  | "profile_report_bug"
   | "profile_total_spend"
   | "profile_total_revenue"
   | "profile_ad_center"
@@ -361,6 +363,7 @@ export const translations: Translations = {
     profile_account: "Account",
     profile_settings: "Settings",
     profile_support: "Support",
+    profile_report_bug: "Report a Bug",
     profile_total_spend: "Total Spend",
     profile_total_revenue: "Total Revenue",
     profile_ad_center: "Ad Center",
@@ -610,6 +613,7 @@ export const translations: Translations = {
     profile_account: "الحساب",
     profile_settings: "الإعدادات",
     profile_support: "الدعم",
+    profile_report_bug: "الإبلاغ عن مشكلة",
     profile_total_spend: "إجمالي المصروف",
     profile_total_revenue: "إجمالي الإيراد",
     profile_ad_center: "مركز الإعلانات",
@@ -859,7 +863,8 @@ export const translations: Translations = {
     profile_account: "الحساب",
     profile_settings: "الإعدادات",
     profile_support: "الدعم",
-    profile_total_spend: "إجمالي المصاريف",
+    profile_report_bug: "بلغ عن مشكلة",
+    profile_total_spend: "صرفت قد إيه",
     profile_total_revenue: "إجمالي المكسب",
     profile_ad_center: "مركز الإعلانات",
     profile_interests: "اهتماماتي",
@@ -1041,7 +1046,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         } else {
           // prioritized IP based detection instead of system location
           console.log("[i18n] Detecting country by IP...");
-          const ipCountry = await getCountryCodeByIP();
+          const geo = await getGeoInfoByIP();
+          const ipCountry = geo?.country;
           console.log(`[i18n] IP Country: ${ipCountry}`);
 
           const isEgypt = ipCountry === "EG";

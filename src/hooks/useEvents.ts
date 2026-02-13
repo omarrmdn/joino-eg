@@ -10,7 +10,9 @@ import {
   DEFAULT_CURRENCY_CODE,
   getCountryCodeFromLocale,
 } from "../utils/currency";
+import { getGeoInfoByIP } from "../utils/ip";
 import { getDistance } from "../utils/location";
+
 
 // Helper to generate upcoming occurrences for recurring events
 const RECURRENCE_DAYS_AHEAD = 60;
@@ -167,6 +169,19 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
       setLoading(true);
       setError(null);
 
+      // --- Location Detection Enhancement ---
+      let activeLocation = userLocation;
+      let detectedArea: string | null = null;
+
+      if (!activeLocation) {
+        const geoResult = await getGeoInfoByIP();
+        if (geoResult?.latitude && geoResult?.longitude) {
+          activeLocation = { latitude: geoResult.latitude, longitude: geoResult.longitude };
+          detectedArea = geoResult.city;
+          console.log(`[useEvents] Using IP location: ${detectedArea} (${activeLocation.latitude}, ${activeLocation.longitude})`);
+        }
+      }
+
       let userInterests: string[] = [];
       let userCurrencyCode: string | null = null;
 
@@ -273,9 +288,9 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
           const { data: personalizedData, error: funcError } = await supabase.functions.invoke('get-personalized-events', {
             body: {
               user_id: userId,
-              location: userLocation ? {
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude
+              location: activeLocation ? {
+                latitude: activeLocation.latitude,
+                longitude: activeLocation.longitude
               } : null,
               search_query: searchQuery,
               max_price: maxPrice,
@@ -331,17 +346,26 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
             let distanceA = 0;
             let distanceB = 0;
 
-            if (userLocation) {
+            if (activeLocation) {
               const hasLocA = a.latitude !== null && a.latitude !== undefined && a.longitude !== null && a.longitude !== undefined;
               const hasLocB = b.latitude !== null && b.latitude !== undefined && b.longitude !== null && b.longitude !== undefined;
 
               distanceA = hasLocA
-                ? getDistance(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude)
+                ? getDistance(activeLocation.latitude, activeLocation.longitude, a.latitude, a.longitude)
                 : 1000;
 
               distanceB = hasLocB
-                ? getDistance(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude)
+                ? getDistance(activeLocation.latitude, activeLocation.longitude, b.latitude, b.longitude)
                 : 1000;
+
+              // Prioritize same area/city name if detected
+              if (detectedArea) {
+                const cityLower = detectedArea.toLowerCase();
+                const aLocLower = (a.location || "").toLowerCase();
+                const bLocLower = (b.location || "").toLowerCase();
+                if (aLocLower.includes(cityLower)) distanceA -= 50;
+                if (bLocLower.includes(cityLower)) distanceB -= 50;
+              }
             }
 
             const scoreA = interestScoreA + distanceA;
@@ -374,11 +398,16 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
           if (gender && gender !== 'all' && event.gender && event.gender !== 'all' && event.gender !== gender) return false;
 
           // Filter by Distance (if location provided)
-          if (userLocation) {
+          if (activeLocation) {
             const hasLoc = event.latitude !== null && event.latitude !== undefined && event.longitude !== null && event.longitude !== undefined;
             if (hasLoc) {
-              const dist = getDistance(userLocation.latitude, userLocation.longitude, event.latitude, event.longitude);
+              const dist = getDistance(activeLocation.latitude, activeLocation.longitude, event.latitude, event.longitude);
               if (dist > 50) return false; // Default 50km radius for search
+            } else if (detectedArea) {
+              // Fallback to city name filter if coordinates missing on event
+              const cityLower = detectedArea.toLowerCase();
+              const eventLocLower = (event.location || "").toLowerCase();
+              if (!eventLocLower.includes(cityLower)) return false;
             }
           }
 

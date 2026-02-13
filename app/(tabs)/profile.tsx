@@ -473,9 +473,12 @@ export default function ProfileScreen() {
           <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={24} color={Colors.white} />
-          <Text style={styles.menuItemText}>{t("profile_support")}</Text>
+        <TouchableOpacity 
+          style={styles.menuItem}
+          onPress={() => router.push("/report-bug" as any)}
+        >
+          <Ionicons name="bug-outline" size={24} color={Colors.white} />
+          <Text style={styles.menuItemText}>{t("profile_report_bug")}</Text>
           <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </Animated.View>

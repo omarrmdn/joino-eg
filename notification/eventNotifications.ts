@@ -256,32 +256,40 @@ export async function notifyNewQuestion(
       event_title: event.title,
     };
 
-    const t = await getStaticT();
-    await createNotification(
-      client,
-      organizerId,
-      'question',
-      t('notification_question_title'),
-      t('notification_question_body', { name: askerName, title: event.title }),
-      notificationData
-    );
-
-    // Also persist the question in the organizer's inbox
+    // 1. Persist the question in the inbox as a message
     if (organizerId !== askerId) {
-      // Create message regardless of previous conversation history
-      const { error: messageError } = await client.from('messages').insert({
-        event_id: eventId,
-        sender_id: askerId,
-        recipient_id: organizerId,
-        message_type: 'general',
-        subject: event.title,
-        body: questionText,
-        created_at: new Date().toISOString(),
-      });
+      try {
+        const { error: messageError } = await client.from('messages').insert({
+          event_id: eventId,
+          sender_id: askerId,
+          recipient_id: organizerId,
+          message_type: 'general',
+          subject: event.title,
+          body: questionText,
+          created_at: new Date().toISOString(),
+        });
 
-      if (messageError) {
-        console.error('Error sending question message:', messageError);
+        if (messageError) {
+          console.error('Error sending question message:', messageError);
+        }
+      } catch (msgErr) {
+        console.error('Exception sending question message:', msgErr);
       }
+    }
+
+    // 2. Send push notification (best effort)
+    try {
+      const t = await getStaticT();
+      await createNotification(
+        client,
+        organizerId,
+        'question',
+        t('notification_question_title'),
+        t('notification_question_body', { name: askerName, title: event.title }),
+        notificationData
+      );
+    } catch (notifErr) {
+      console.warn('Notification failed but message was sent:', notifErr);
     }
 
     return { success: true };
@@ -315,33 +323,42 @@ export async function notifyQuestionAnswer(
     };
 
     const t = await getStaticT();
-    await createNotification(
-      client,
-      attendeeId,
-      'question',
-      t('notification_answer_title'),
-      t('notification_answer_body', { name: organizerName, title: event.title }),
-      notificationData
-    );
 
-    // Also persist the answer in the inbox as a message from organizer
+    // 1. Persist the answer in the inbox as a message from organizer
     if (event.organizer_id && event.organizer_id !== attendeeId) {
-      // We assume the answer notification body as the message body for now
-      const messageBody = t('notification_answer_body', { name: organizerName, title: event.title });
+      try {
+        const messageBody = t('notification_answer_body', { name: organizerName, title: event.title });
 
-      const { error: messageError } = await client.from('messages').insert({
-        event_id: eventId,
-        sender_id: event.organizer_id,
-        recipient_id: attendeeId,
-        message_type: 'general',
-        subject: event.title,
-        body: messageBody,
-        created_at: new Date().toISOString(),
-      });
+        const { error: messageError } = await client.from('messages').insert({
+          event_id: eventId,
+          sender_id: event.organizer_id,
+          recipient_id: attendeeId,
+          message_type: 'general',
+          subject: event.title,
+          body: messageBody,
+          created_at: new Date().toISOString(),
+        });
 
-      if (messageError) {
-        console.error('Error sending answer message:', messageError);
+        if (messageError) {
+          console.error('Error sending answer message:', messageError);
+        }
+      } catch (msgErr) {
+        console.error('Exception sending answer message:', msgErr);
       }
+    }
+
+    // 2. Send push notification
+    try {
+      await createNotification(
+        client,
+        attendeeId,
+        'question',
+        t('notification_answer_title'),
+        t('notification_answer_body', { name: organizerName, title: event.title }),
+        notificationData
+      );
+    } catch (notifErr) {
+      console.warn('Notification failed but answer message was sent:', notifErr);
     }
 
     return { success: true };

@@ -43,19 +43,22 @@ serve(async (req: Request) => {
 
         console.log(`[detect-currency] Processing IP: ${ip}`);
 
-        // 1. Detect Country
-        let countryCode = req.headers.get('cf-ipcountry') || req.headers.get('x-vercel-ip-country');
+        // Detect City and Coordinates
+        let city = null;
+        let lat = null;
+        let lon = null;
 
-        if (!countryCode) {
-            try {
-                const geoResponse = await fetch(`https://ipapi.co/${ip}/json/`);
-                if (geoResponse.ok) {
-                    const geoData = await geoResponse.json();
-                    countryCode = geoData.country_code;
-                }
-            } catch (e) {
-                console.warn(`[detect-currency] Geolocation failed:`, e);
+        try {
+            const geoResponse = await fetch(`https://ipapi.co/${ip}/json/`);
+            if (geoResponse.ok) {
+                const geoData = await geoResponse.json();
+                countryCode = countryCode || geoData.country_code;
+                city = geoData.city;
+                lat = geoData.latitude;
+                lon = geoData.longitude;
             }
+        } catch (e) {
+            console.warn(`[detect-currency] Geolocation failed:`, e);
         }
 
         if (!countryCode) {
@@ -97,9 +100,14 @@ serve(async (req: Request) => {
                     currency_updated_at: new Date().toISOString(),
                 };
 
+                // Store last location if city/lat/lon detected
+                if (city) updates.last_location = city;
+                if (lat && lon) {
+                    updates.latitude = lat;
+                    updates.longitude = lon;
+                }
+
                 // Use supabaseClient (User Context) to update own profile. 
-                // This usually works with standard RLS policies.
-                // If it fails, we log but don't fail the request.
                 const { error: updateError } = await supabaseClient
                     .from('users')
                     .update(updates)
@@ -123,6 +131,9 @@ serve(async (req: Request) => {
             JSON.stringify({
                 currency: detectedCurrency,
                 country: countryCode,
+                city,
+                latitude: lat,
+                longitude: lon,
                 ip_used: ip
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
