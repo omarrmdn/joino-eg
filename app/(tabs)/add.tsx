@@ -766,7 +766,7 @@ export default function AddScreen() {
 
     if (Object.keys(errors).length > 0) {
       showAlert({
-        title: t("error_past_date_title"),
+        title: t("error_title"),
         message: t("error_required_fields"),
         type: 'warning',
       });
@@ -1609,7 +1609,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.regular,
     textAlign: "center",
-    marginTop: -12,
+    marginTop: 4,
     marginBottom: 12,
   },
   form: { gap: 15 },

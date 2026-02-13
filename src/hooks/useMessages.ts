@@ -55,21 +55,84 @@ export function useMessages() {
             setError(null);
 
             // Fetch messages where user is sender or recipient
-            const { data, error: fetchError } = await supabase
-                .from('messages')
-                .select(`
-          *,
-          sender:users!messages_sender_id_fkey (name, image_url),
-          recipient:users!messages_recipient_id_fkey (name, image_url),
-          event:events (title, organizer_id)
-        `)
-                .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-                .order('created_at', { ascending: false });
+            const [messagesRes, questionsRes] = await Promise.all([
+                supabase
+                    .from('messages')
+                    .select(`
+                        *,
+                        sender:users!messages_sender_id_fkey (name, image_url),
+                        recipient:users!messages_recipient_id_fkey (name, image_url),
+                        event:events (title, organizer_id)
+                    `)
+                    .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('event_questions')
+                    .select(`
+                        *,
+                        user:users!event_questions_user_id_fkey (name, image_url),
+                        organizer:users!event_questions_organizer_id_fkey (name, image_url),
+                        event:events (title, organizer_id)
+                    `)
+                    .or(`user_id.eq.${user.id},organizer_id.eq.${user.id}`)
+                    .order('created_at', { ascending: false })
+            ]);
 
-            if (fetchError) throw fetchError;
-            // Filter out self-memos for link messages (redundant but safe)
-            const msgs = (data || []).filter(m => !(m.sender_id === m.recipient_id && m.message_type === 'event_link'));
-            setMessages(msgs);
+            if (messagesRes.error) throw messagesRes.error;
+            if (questionsRes.error) throw questionsRes.error;
+
+            // Normalize questions to DBMessage format
+            const normalizedQuestions: DBMessage[] = (questionsRes.data || []).flatMap(q => {
+                const msgs: DBMessage[] = [];
+
+                // The question itself
+                msgs.push({
+                    id: `q-${q.id}`,
+                    event_id: q.event_id,
+                    sender_id: q.user_id,
+                    recipient_id: q.organizer_id,
+                    message_type: 'general',
+                    subject: 'Question',
+                    body: q.question,
+                    event_link: null,
+                    read: !!q.answer, // If it has an answer, count as "read" for the question list logic
+                    created_at: q.created_at,
+                    read_at: q.answered_at,
+                    sender: q.user,
+                    recipient: q.organizer,
+                    event: q.event
+                });
+
+                // The answer if it exists
+                if (q.answer) {
+                    msgs.push({
+                        id: `a-${q.id}`,
+                        event_id: q.event_id,
+                        sender_id: q.organizer_id,
+                        recipient_id: q.user_id,
+                        message_type: 'general',
+                        subject: 'Answer',
+                        body: q.answer,
+                        event_link: null,
+                        read: true,
+                        created_at: q.answered_at || q.created_at,
+                        read_at: q.answered_at,
+                        sender: q.organizer,
+                        recipient: q.user,
+                        event: q.event
+                    });
+                }
+
+                return msgs;
+            });
+
+            // Combine messages and sorted by created_at desc
+            const allMessages = [
+                ...(messagesRes.data || []).filter(m => !(m.sender_id === m.recipient_id && m.message_type === 'event_link')),
+                ...normalizedQuestions
+            ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+            setMessages(allMessages);
         } catch (err) {
             console.error('Error fetching messages:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch messages');
@@ -83,8 +146,8 @@ export function useMessages() {
 
         if (!user) return;
 
-        // Real-time subscription for new messages
-        const channel = supabase
+        // Real-time subscription for new messages and questions
+        const messagesChannel = supabase
             .channel('messages_changes')
             .on(
                 'postgres_changes',
@@ -99,8 +162,24 @@ export function useMessages() {
             )
             .subscribe();
 
+        const questionsChannel = supabase
+            .channel('questions_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'event_questions',
+                },
+                () => {
+                    fetchMessages(false);
+                }
+            )
+            .subscribe();
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(messagesChannel);
+            supabase.removeChannel(questionsChannel);
         };
     }, [fetchMessages, user, supabase]);
 
