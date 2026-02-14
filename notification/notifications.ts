@@ -72,4 +72,13 @@ export interface PushNotificationData {
   matched_interests?: number;
   cancellation_reason?: string;
   link?: string;
+  create_message?: boolean;
+  message_type?: 'general' | 'event_link';
+  message_body?: string;
+  message_subject?: string;
+  sender_id?: string;
+  recipient_id?: string;
+  asker_name?: string;
+  question_text?: string;
+  answer_text?: string;
 }

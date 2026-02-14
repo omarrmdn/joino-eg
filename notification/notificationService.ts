@@ -2,7 +2,6 @@
 
 import * as Device from "expo-device";
 import type { PushNotificationData } from "./notifications";
-import { supabase } from "./supabase";
 
 // Lazy load Notifications to avoid import errors in Expo Go
 let Notifications: any = null;
@@ -208,7 +207,11 @@ class NotificationService {
     supabaseClient?: any,
   ): Promise<void> {
     try {
-      const client = supabaseClient || supabase;
+      if (!supabaseClient) {
+        console.error('[NotificationService] No supabase client provided');
+        return;
+      }
+      const client = supabaseClient;
       const deviceName =
         Device.deviceName || `${Device.brand} ${Device.modelName}`;
 
@@ -239,7 +242,11 @@ class NotificationService {
    */
   async removeToken(token: string, supabaseClient?: any): Promise<void> {
     try {
-      const client = supabaseClient || supabase;
+      if (!supabaseClient) {
+        console.error('[NotificationService] No supabase client provided');
+        return;
+      }
+      const client = supabaseClient;
       const { error } = await client
         .from("expo_push_tokens")
         .delete()

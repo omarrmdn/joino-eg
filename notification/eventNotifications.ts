@@ -92,33 +92,25 @@ export async function notifyAttendeeEventAccessDetails(
         : `This is an onsite event, but the organizer hasn't added a specific location yet.`;
     }
 
-    // Send push notification
+    // Send push notification (triggers message creation via Edge Function if applicable)
+    // Note: create_message flag tells the backend to insert a message into the inbox
     await createNotification(
       client,
       attendeeId,
       'event_access',
       title,
       body,
-      notificationData
-    );
-
-    // Also send a formal message in the Inbox (persisted in messages table)
-    // Only for online events with a link for now, as requested
-    if (isOnline && hasLink && event.organizer_id) {
-      const { error: messageError } = await client.from('messages').insert({
-        event_id: eventId,
+      {
+        ...notificationData,
+        create_message: isOnline && hasLink && !!event.organizer_id,
         sender_id: event.organizer_id,
-        recipient_id: attendeeId,
         message_type: 'event_link',
-        subject: isOnline ? t('notification_event_access_online_title') : t('notification_event_access_onsite_title'),
-        body: body,
-        event_link: event.link,
-      });
-
-      if (messageError) {
-        console.error('Error sending event link message:', messageError);
-      }
-    }
+        message_body: body, // Use the localized body
+        message_subject: title,
+        link: event.link
+      },
+      true // Send local notification immediately
+    );
 
     return { success: true };
   } catch (error: any) {
@@ -197,7 +189,9 @@ export async function notifyAttendeeCancellationSelf(
       'attendee_cancel',
       t('notification_attendee_cancel_confirmation_title'),
       t('notification_attendee_cancel_confirmation_body', { title: event.title }),
-      { event_id: eventId, event_title: event.title }
+
+      { event_id: eventId, event_title: event.title },
+      true // Send local notification immediately
     );
 
     return { success: true };
@@ -287,30 +281,16 @@ export async function notifyNewQuestion(
       event_id: eventId,
       question_id: questionId,
       event_title: event.title,
+      create_message: true,
+      message_type: 'general',
+      sender_id: askerId,
+      recipient_id: organizerId,
+      message_body: questionText,
+      asker_name: askerName,
+      question_text: questionText,
     };
 
-    // 1. Persist the question in the inbox as a message
-    if (organizerId !== askerId) {
-      try {
-        const { error: messageError } = await client.from('messages').insert({
-          event_id: eventId,
-          sender_id: askerId,
-          recipient_id: organizerId,
-          message_type: 'general',
-          subject: event.title,
-          body: questionText,
-          created_at: new Date().toISOString(),
-        });
-
-        if (messageError) {
-          console.error('Error sending question message:', messageError);
-        }
-      } catch (msgErr) {
-        console.error('Exception sending question message:', msgErr);
-      }
-    }
-
-    // 2. Send push notification (best effort)
+    // 1. Send push notification to Organizer (triggers message creation via Edge Function)
     try {
       const t = await getStaticT();
       await createNotification(
@@ -321,6 +301,23 @@ export async function notifyNewQuestion(
         t('notification_question_body', { name: askerName, title: event.title }),
         notificationData
       );
+
+      // 2. Notify Asker (Self) - Local Confirmation
+      await createNotification(
+        client,
+        askerId,
+        'question', // Reuse question type or generic
+        t('event_question_submitted_title'), // "Success"
+        t('event_question_submitted'), // "Your question has been submitted"
+        {
+          event_id: eventId,
+          event_title: event.title,
+          question_text: questionText
+        },
+        true // Send local notification immediately
+      );
+
+
     } catch (notifErr) {
       console.warn('Notification failed but message was sent:', notifErr);
     }
@@ -357,41 +354,32 @@ export async function notifyQuestionAnswer(
 
     const t = await getStaticT();
 
-    // 1. Persist the answer in the inbox as a message from organizer
-    if (event.organizer_id && event.organizer_id !== attendeeId) {
-      try {
-        const messageBody = t('notification_answer_body', { name: organizerName, title: event.title });
+    const title = t('notification_answer_title');
+    const body = t('notification_answer_body', { name: organizerName, title: event.title });
 
-        const { error: messageError } = await client.from('messages').insert({
-          event_id: eventId,
-          sender_id: event.organizer_id,
-          recipient_id: attendeeId,
-          message_type: 'general',
-          subject: event.title,
-          body: messageBody,
-          created_at: new Date().toISOString(),
-        });
+    const enrichedData: PushNotificationData = {
+      ...notificationData,
+      create_message: true,
+      message_type: 'general',
+      sender_id: event.organizer_id, // Organizer is answering
+      recipient_id: attendeeId,
+      message_body: body,
+      answer_text: body, // Or just use body
+      asker_name: organizerName // Organizer name as sender
+    };
 
-        if (messageError) {
-          console.error('Error sending answer message:', messageError);
-        }
-      } catch (msgErr) {
-        console.error('Exception sending answer message:', msgErr);
-      }
-    }
-
-    // 2. Send push notification
+    // Send push notification (triggers message creation via Edge Function)
     try {
       await createNotification(
         client,
         attendeeId,
-        'question',
-        t('notification_answer_title'),
-        t('notification_answer_body', { name: organizerName, title: event.title }),
-        notificationData
+        'question', // Or 'answer'? keeping 'question' for now to match types
+        title,
+        body,
+        enrichedData
       );
     } catch (notifErr) {
-      console.warn('Notification failed but answer message was sent:', notifErr);
+      console.warn('Notification failed:', notifErr);
     }
 
     return { success: true };
@@ -481,6 +469,30 @@ export async function notifyEventCancellation(
         notificationData
       );
       if (result.success) notified++;
+    }
+
+    // Also notify the organizer (self) - Confirmation
+    try {
+      const { data: eventDetails } = await client
+        .from('events')
+        .select('organizer_id')
+        .eq('id', eventId)
+        .single();
+
+      if (eventDetails?.organizer_id) {
+        await createNotification(
+          client,
+          eventDetails.organizer_id,
+          'attendee_cancel',
+          title,
+          t('notification_attendee_cancel_confirmation_body', { title: event.title }),
+
+          notificationData,
+          true // Send local notification immediately
+        );
+      }
+    } catch (e) {
+      console.error('Error notifying organizer of own cancellation:', e);
     }
 
     return { success: true, notified };
@@ -578,29 +590,26 @@ export async function notifyEventLinkUpdate(
       // Don't notify organizer
       if (attendee.user_id === event.organizer_id) continue;
 
-      // 1. Send push/database notification
+      // Send push/database notification (triggers message creation via Edge Function)
       const result = await createNotification(
         client,
         attendee.user_id,
         'event_update',
         title,
         body,
-        { event_id: eventId, event_title: event.title, link }
+        {
+          event_id: eventId,
+          event_title: event.title,
+          link,
+          create_message: true,
+          message_type: 'event_link',
+          sender_id: event.organizer_id,
+          message_body: body,
+          message_subject: title
+        }
       );
 
-      // 2. Also send as an inbox message if it succeeds
-      if (result.success) {
-        await client.from('messages').insert({
-          event_id: eventId,
-          sender_id: event.organizer_id,
-          recipient_id: attendee.user_id,
-          message_type: 'event_link',
-          subject: title,
-          body: body,
-          event_link: link,
-        });
-        notified++;
-      }
+      if (result.success) notified++;
     }
 
     return { success: true, notified };

@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { NotificationType, PushNotificationData } from "./notifications";
+import notificationService from "./notificationService";
 
 export async function createNotification(
   client: SupabaseClient,
@@ -7,10 +8,17 @@ export async function createNotification(
   type: NotificationType,
   title: string,
   body: string,
+
   data?: PushNotificationData,
+  sendLocal: boolean = false
 ): Promise<{ success: boolean; notificationId?: string; error?: string }> {
   try {
-    console.log(`Creating notification: type=${type}, userId=${userId}, title=${title}`);
+    console.log(`Creating notification: type=${type}, userId=${userId}, title=${title}, local=${sendLocal}`);
+
+    // If requested, send local notification immediately
+    if (sendLocal) {
+      await notificationService.sendLocalNotification(title, body, data);
+    }
     const { data: notification, error } = await client
       .from("notifications")
       .insert({

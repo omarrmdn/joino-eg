@@ -1136,11 +1136,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       I18nManager.allowRTL(shouldUseRTL);
       I18nManager.forceRTL(shouldUseRTL);
       
-      // We only reload if the user EXPLICITLY changed the language in this session
-      if (languageChanged) {
+      // Reload if the user EXPLICITLY changed the language OR if it's the first load with mismatch
+      if (languageChanged || (previousLanguage === null && I18nManager.isRTL !== shouldUseRTL)) {
           const timer = setTimeout(async () => {
             try {
-              console.log("[i18n] Reloading for EXPLICIT language change...");
+              console.log("[i18n] Reloading for language/layout change...");
               if (__DEV__) {
                 if (typeof DevSettings !== 'undefined' && DevSettings.reload) {
                   DevSettings.reload();
@@ -1151,7 +1151,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
             } catch (e) {
               console.warn("[i18n] Reload failed", e);
             }
-          }, 1000);
+          }, 500); // Reduced delay for faster feedback
           return () => clearTimeout(timer);
       }
     }

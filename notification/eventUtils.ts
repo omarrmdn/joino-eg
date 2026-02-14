@@ -230,13 +230,22 @@ export async function leaveEvent(
 
     // Notify organizer of cancellation
     if (eventData && attendeeData) {
-      const { notifyAttendeeCancellation } =
+      const { notifyAttendeeCancellation, notifyAttendeeCancellationSelf } =
         await import("./eventNotifications");
+
+      // 1. Notify Organizer
       await notifyAttendeeCancellation(
         client,
         eventId,
         eventData.organizer_id,
         attendeeData.name || "Someone",
+      );
+
+      // 2. Notify User (Self) - Confirmation
+      await notifyAttendeeCancellationSelf(
+        client,
+        eventId,
+        userId
       );
     }
 
