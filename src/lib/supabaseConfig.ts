@@ -15,6 +15,10 @@ export function useSupabaseClient() {
         const isWebSSR = Platform.OS === 'web' && typeof window === 'undefined';
 
         const options: any = {
+            auth: {
+                persistSession: false, // We use Clerk, so Supabase shouldn't try to persist its own session
+                detectSessionInUrl: false,
+            },
             global: {
                 fetch: async (url: any, options: any = {}) => {
                     if (isWebSSR) return fetch(url, options); // Simple fetch for SSR
@@ -99,9 +103,6 @@ export function useSupabaseClient() {
             },
         };
 
-        if (isWebSSR) {
-            options.auth = { persistSession: false };
-        }
 
         return createClient(supabaseUrl, supabaseAnonKey, options);
     }, []);
