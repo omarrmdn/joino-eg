@@ -14,7 +14,7 @@ import { Colors } from "../src/constants/Colors";
 import { useTrackSession } from "../src/hooks/useTrackSession";
 import { AlertProvider } from "../src/lib/AlertContext";
 import { tokenCache } from "../src/lib/cache";
-import { LanguageProvider } from "../src/lib/i18n";
+import { LanguageProvider, useLanguage } from "../src/lib/i18n";
 import { useSupabaseClient } from "../src/lib/supabaseConfig";
 import OnboardingScreen from "./Onboarding";
 
@@ -161,12 +161,23 @@ interface RootContentProps {
 }
 
 const RootContent = ({ appIsReady, showOnboarding, setShowOnboarding }: RootContentProps) => {
-  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const supabase = useSupabaseClient();
   const { trackAction } = useTrackSession();
+  const { language } = useLanguage();
   
   // Initialize Push Notifications
   usePushNotifications();
+
+  // Sync language with Supabase user record
+  useEffect(() => {
+    if (isSignedIn && userId && language) {
+       // Fire and forget update
+       supabase.from('users').update({ language }).eq('id', userId).then(({ error }) => {
+         if (error) console.warn('[RootContent] Language sync error:', error);
+       });
+    }
+  }, [isSignedIn, userId, language]);
   const prevSignedInRef = useRef<boolean | null>(null);
 
   useEffect(() => {

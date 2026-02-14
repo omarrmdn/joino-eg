@@ -12,7 +12,6 @@ import React, {
 import { DevSettings, I18nManager } from "react-native";
 
 import { getGeoInfoByIP } from "../utils/ip";
-import { useSupabaseClient } from "./supabaseConfig";
 
 type Language = "en" | "ar" | "ar-EG";
 
@@ -1074,7 +1073,6 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(
 const STORAGE_KEY = "app_language";
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const supabase = useSupabaseClient();
   const [language, setLanguageState] = useState<Language>("en");
   const [hydrated, setHydrated] = useState(false);
   const previousLanguageRef = useRef<Language | null>(null);
@@ -1118,22 +1116,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
     loadLanguage();
   }, []);
-
-  // Sync with Supabase when hydrated or language changes
-  useEffect(() => {
-    if (!hydrated) return;
-    const syncLang = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
-          await supabase.from("users").update({ language }).eq("id", session.user.id);
-        }
-      } catch (e) {
-        console.warn("[i18n] Language sync error:", e);
-      }
-    };
-    syncLang();
-  }, [hydrated, language]);
 
   // Apply RTL/LTR layout based on selected language and force app reload on change
   useEffect(() => {
@@ -1194,13 +1176,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         try {
           setLanguageState(lang);
           await AsyncStorage.setItem(STORAGE_KEY, lang);
-          
-          // Sync with Supabase if user is logged in
-          const { data: { session } } = await supabase.auth.getSession();
-          const userId = session?.user?.id;
-          if (userId) {
-            await supabase.from("users").update({ language: lang }).eq("id", userId);
-          }
         } catch (e) {
           console.warn("Failed to persist language preference", e);
         }

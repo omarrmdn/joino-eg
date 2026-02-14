@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { createClient } from '@supabase/supabase-js';
 import { useMemo } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
@@ -10,9 +11,14 @@ export function useSupabaseClient() {
     const { getToken } = useAuth();
 
     return useMemo(() => {
-        return createClient(supabaseUrl, supabaseAnonKey, {
+        // Safe initialization for Expo Web Static Export (SSR)
+        const isWebSSR = Platform.OS === 'web' && typeof window === 'undefined';
+
+        const options: any = {
             global: {
-                fetch: async (url, options = {}) => {
+                fetch: async (url: any, options: any = {}) => {
+                    if (isWebSSR) return fetch(url, options); // Simple fetch for SSR
+
                     const getAuthToken = async (forceRefresh: boolean) => {
                         try {
                             return await getToken({
@@ -91,6 +97,12 @@ export function useSupabaseClient() {
                     return response;
                 },
             },
-        });
+        };
+
+        if (isWebSSR) {
+            options.auth = { persistSession: false };
+        }
+
+        return createClient(supabaseUrl, supabaseAnonKey, options);
     }, []);
 }

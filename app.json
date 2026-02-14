@@ -74,7 +74,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/8d20b8c5-e1c1-4380-88ec-4a7706150107"
     },
     "owner": "omar2rmdn"
   }
