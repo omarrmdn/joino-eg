@@ -100,15 +100,33 @@ export async function notifyAttendeeEventAccessDetails(
       'event_access',
       title,
       body,
-      {
-        ...notificationData,
-        create_message: isOnline && hasLink && !!event.organizer_id,
-        sender_id: event.organizer_id,
-        message_type: 'event_link',
-        message_body: body, // Use the localized body
-        message_subject: title,
-        link: event.link
-      },
+    const finalData = {
+      ...notificationData,
+      create_message: isOnline && hasLink && !!event.organizer_id,
+      sender_id: event.organizer_id,
+      message_type: 'event_link' as const,
+      message_body: body, // Use the localized body
+      message_subject: title,
+      link: event.link
+    };
+
+    console.log('[notifyAttendeeEventAccessDetails] Sending notification:', {
+      attendeeId,
+      isOnline,
+      hasLink,
+      organizerId: event.organizer_id,
+      create_message: finalData.create_message
+    });
+
+    // Send push notification (triggers message creation via Edge Function if applicable)
+    // Note: create_message flag tells the backend to insert a message into the inbox
+    await createNotification(
+      client,
+      attendeeId,
+      'event_access',
+      title,
+      body,
+      finalData,
       true // Send local notification immediately
     );
 
@@ -597,16 +615,27 @@ export async function notifyEventLinkUpdate(
         'event_update',
         title,
         body,
-        {
-          event_id: eventId,
-          event_title: event.title,
-          link,
-          create_message: true,
-          message_type: 'event_link',
-          sender_id: event.organizer_id,
-          message_body: body,
-          message_subject: title
-        }
+      const notificationPayload = {
+        event_id: eventId,
+        event_title: event.title,
+        link,
+        create_message: true,
+        message_type: 'event_link' as const,
+        sender_id: event.organizer_id,
+        message_body: body,
+        message_subject: title
+      };
+
+      console.log(`[notifyEventLinkUpdate] Notifying attendee ${attendee.user_id}`);
+
+      // Send push/database notification (triggers message creation via Edge Function)
+      const result = await createNotification(
+        client,
+        attendee.user_id,
+        'event_update',
+        title,
+        body,
+        notificationPayload
       );
 
       if (result.success) notified++;

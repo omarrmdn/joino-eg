@@ -32,24 +32,39 @@ serve(async (req: Request) => {
         // 0. Check if this notification should auto-create a message in the Inbox
         // This handles cases where RLS prevents client-side creation (e.g. system messages)
         if (notification.data && notification.data.create_message) {
-            console.log(`[Push] Auto-creating message for notification ${notification.id}`);
+            console.log(`[Push] Auto-creating message for notification ${notification.id}. Type: ${notification.type}`);
             const msgData = notification.data;
-            const messagePayload = {
-                event_id: msgData.event_id,
-                sender_id: msgData.sender_id,
-                recipient_id: msgData.recipient_id || notification.user_id,
-                message_type: msgData.message_type || 'general',
-                subject: msgData.message_subject || notification.title,
-                body: msgData.message_body || notification.body,
-                event_link: msgData.link || undefined,
-                created_at: new Date().toISOString()
-            };
 
-            const { error: msgError } = await supabase.from('messages').insert(messagePayload);
-            if (msgError) {
-                console.error('[Push] Message creation failed:', msgError);
+            // Validate minimal requirements
+            const senderId = msgData.sender_id;
+            const recipientId = msgData.recipient_id || notification.user_id;
+            const eventId = msgData.event_id;
+
+            if (!senderId || !recipientId || !eventId) {
+                console.warn('[Push] Skipping message creation due to missing required fields:', {
+                    senderId, recipientId, eventId, notificationId: notification.id
+                });
             } else {
-                console.log('[Push] Message created successfully.');
+                const messagePayload = {
+                    event_id: eventId,
+                    sender_id: senderId,
+                    recipient_id: recipientId,
+                    message_type: msgData.message_type || 'general',
+                    subject: msgData.message_subject || notification.title || 'Event Notification',
+                    body: msgData.message_body || notification.body || '',
+                    event_link: msgData.link || null,
+                    created_at: new Date().toISOString()
+                };
+
+                console.log('[Push] Inserting message:', JSON.stringify(messagePayload));
+
+                const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert(messagePayload).select().single();
+
+                if (msgError) {
+                    console.error('[Push] Message creation failed:', JSON.stringify(msgError));
+                } else {
+                    console.log('[Push] Message created successfully. ID:', insertedMsg?.id);
+                }
             }
         }
 
