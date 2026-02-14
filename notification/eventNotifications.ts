@@ -94,12 +94,6 @@ export async function notifyAttendeeEventAccessDetails(
 
     // Send push notification (triggers message creation via Edge Function if applicable)
     // Note: create_message flag tells the backend to insert a message into the inbox
-    await createNotification(
-      client,
-      attendeeId,
-      'event_access',
-      title,
-      body,
     const finalData = {
       ...notificationData,
       create_message: isOnline && hasLink && !!event.organizer_id,
@@ -608,13 +602,6 @@ export async function notifyEventLinkUpdate(
       // Don't notify organizer
       if (attendee.user_id === event.organizer_id) continue;
 
-      // Send push/database notification (triggers message creation via Edge Function)
-      const result = await createNotification(
-        client,
-        attendee.user_id,
-        'event_update',
-        title,
-        body,
       const notificationPayload = {
         event_id: eventId,
         event_title: event.title,
