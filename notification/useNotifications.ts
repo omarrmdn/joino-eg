@@ -37,6 +37,7 @@ export function useNotifications() {
         throw error;
       }
 
+      console.log(`Fetched ${data?.length || 0} notifications for user ${userId}`);
       setNotifications(data || []);
       const unread = data?.filter((n) => !n.read).length || 0;
       setUnreadCount(unread);
@@ -200,14 +201,19 @@ export function useNotifications() {
         case "reminder_2hr":
         case "new_event":
         case "event_access":
+        case "recommendation":
+        case "event_update":
           if (data.event_id) {
             router.push({ pathname: "/event-details", params: { id: data.event_id } });
           }
           break;
 
         case "question":
+        case "message":
           if (data.event_id) {
             router.push({ pathname: "/event-details", params: { id: data.event_id } });
+          } else {
+            router.push("/(tabs)/messages");
           }
           break;
       }

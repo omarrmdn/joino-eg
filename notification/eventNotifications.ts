@@ -104,8 +104,7 @@ export async function notifyAttendeeEventAccessDetails(
 
     // Also send a formal message in the Inbox (persisted in messages table)
     // Only for online events with a link for now, as requested
-    // DO NOT send if the attendee IS the organizer (Self-memo)
-    if (isOnline && hasLink && event.organizer_id && attendeeId !== event.organizer_id) {
+    if (isOnline && hasLink && event.organizer_id) {
       const { error: messageError } = await client.from('messages').insert({
         event_id: eventId,
         sender_id: event.organizer_id,
@@ -162,7 +161,7 @@ export async function notifyAttendeeCancellation(
       client,
       organizerId,
       'attendee_cancel',
-      t('notification_cancellation_title'),
+      t('notification_cancellation_title') + `: ${event.title}`,
       body,
       notificationData
     );

@@ -63,11 +63,17 @@ export default function NotificationsScreen() {
       case "reminder_2hr":
         return "alarm-outline";
       case "question":
-        return "help-circle-outline";
+      case "message":
+        return "mail-outline";
       case "new_event":
-        return "location-outline";
+      case "recommendation":
+        return "sparkles-outline";
+      case "event_access":
+        return "key-outline";
+      case "event_update":
+        return "refresh-outline";
       case "event_stats":
-        return "bar-chart-outline";
+        return "stats-chart-outline";
       default:
         return "notifications-outline";
     }

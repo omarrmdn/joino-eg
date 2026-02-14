@@ -10,7 +10,8 @@ export type NotificationType =
   | 'new_event'
   | 'event_stats'
   | 'recommendation'
-  | 'event_update';
+  | 'event_update'
+  | 'message';
 
 export interface Notification {
   id: string;
