@@ -15,6 +15,7 @@ export function useSupabaseSync() {
     if (!isLoaded || !user) return;
 
     const syncUser = async () => {
+      let ipCountry: string | null = null;
       try {
         // 1. Check if user exists
         const { data: existingUser, error: fetchError } = await supabase
@@ -33,9 +34,10 @@ export function useSupabaseSync() {
         let longitude: number | null = null;
         try {
           const geoInfo = await getGeoInfoByIP();
-          if (geoInfo?.latitude && geoInfo.longitude) {
+          if (geoInfo) {
             latitude = geoInfo.latitude;
             longitude = geoInfo.longitude;
+            ipCountry = geoInfo.country;
           }
         } catch (e) {
           console.log('[useSupabaseSync] Geolocation detection failed');
@@ -49,6 +51,7 @@ export function useSupabaseSync() {
           date_signed_in: new Date().toISOString(),
           latitude: latitude,
           longitude: longitude,
+          country_code: ipCountry,
         };
 
         if (existingUser) {
@@ -76,7 +79,7 @@ export function useSupabaseSync() {
           await autoDetectAndUpdateUserCurrency(
             supabase,
             user.id,
-            getCountryCodeFromLocale(),
+            ipCountry || getCountryCodeFromLocale(),
           );
         }
       } catch (currencyError) {

@@ -190,11 +190,9 @@ export default function EventsScreen() {
   const { useFocusEffect } = require("expo-router");
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
-        console.log("📅 [EventsScreen] Refetching on focus..."); // Fixed symbol to match screen
-        fetchMyEvents();
-      }
-    }, [loading])
+      console.log("📅 [EventsScreen] Refetching on focus...");
+      fetchMyEvents();
+    }, [])
   );
 
   useEffect(() => {

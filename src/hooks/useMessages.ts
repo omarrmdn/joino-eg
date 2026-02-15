@@ -58,6 +58,7 @@ export function useMessages() {
             console.log(`[useMessages] Fetching for user: ${user.id} (${user.fullName})`);
 
             // Fetch messages where user is sender or recipient
+            console.log(`[useMessages] Fetching messages and questions for ${user.id}...`);
             const [messagesRes, questionsRes] = await Promise.all([
                 supabase
                     .from('messages')
@@ -82,12 +83,12 @@ export function useMessages() {
             ]);
 
             if (messagesRes.error) {
-                console.error('[useMessages] Messages Fetch Error:', messagesRes.error);
-                throw messagesRes.error;
+                console.error('[useMessages] Messages Fetch Error:', JSON.stringify(messagesRes.error, null, 2));
+                throw new Error(`Messages: ${messagesRes.error.message}`);
             }
             if (questionsRes.error) {
-                console.error('[useMessages] Questions Fetch Error:', questionsRes.error);
-                throw questionsRes.error;
+                console.error('[useMessages] Questions Fetch Error:', JSON.stringify(questionsRes.error, null, 2));
+                throw new Error(`Questions: ${questionsRes.error.message}`);
             }
 
             console.log(`[useMessages] Fetched ${messagesRes.data?.length || 0} messages and ${questionsRes.data?.length || 0} questions`);

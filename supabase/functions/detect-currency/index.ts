@@ -44,6 +44,7 @@ serve(async (req: Request) => {
         console.log(`[detect-currency] Processing IP: ${ip}`);
 
         // Detect City and Coordinates
+        let countryCode = req.headers.get('cf-ipcountry');
         let city = null;
         let lat = null;
         let lon = null;
