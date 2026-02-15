@@ -59,42 +59,44 @@ export function useMessages() {
 
             // Fetch messages where user is sender or recipient
             console.log(`[useMessages] Fetching messages and questions for ${user.id}...`);
-            const [messagesRes, questionsRes] = await Promise.all([
+            // Fetch messages where user is sender OR recipient (split to avoid UUID casting issues in .or() with PostgREST)
+            console.log(`[useMessages] Fetching messages and questions for ${user.id}...`);
+
+            const [msgSender, msgRecipient, qUser, qOrganizer] = await Promise.all([
                 supabase
                     .from('messages')
-                    .select(`
-                        *,
-                        sender:users!messages_sender_id_fkey (name, image_url),
-                        recipient:users!messages_recipient_id_fkey (name, image_url),
-                        event:events (title, organizer_id)
-                    `)
-                    .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-                    .order('created_at', { ascending: false }),
+                    .select('*, sender:users!messages_sender_id_fkey (name, image_url), recipient:users!messages_recipient_id_fkey (name, image_url), event:events (title, organizer_id)')
+                    .eq('sender_id', user.id),
+                supabase
+                    .from('messages')
+                    .select('*, sender:users!messages_sender_id_fkey (name, image_url), recipient:users!messages_recipient_id_fkey (name, image_url), event:events (title, organizer_id)')
+                    .eq('recipient_id', user.id),
                 supabase
                     .from('event_questions')
-                    .select(`
-                        *,
-                        user:users!event_questions_user_id_fkey (name, image_url),
-                        organizer:users!event_questions_organizer_id_fkey (name, image_url),
-                        event:events (title, organizer_id)
-                    `)
-                    .or(`user_id.eq.${user.id},organizer_id.eq.${user.id}`)
-                    .order('created_at', { ascending: false })
+                    .select('*, user:users!event_questions_user_id_fkey (name, image_url), organizer:users!event_questions_organizer_id_fkey (name, image_url), event:events (title, organizer_id)')
+                    .eq('user_id', user.id),
+                supabase
+                    .from('event_questions')
+                    .select('*, user:users!event_questions_user_id_fkey (name, image_url), organizer:users!event_questions_organizer_id_fkey (name, image_url), event:events (title, organizer_id)')
+                    .eq('organizer_id', user.id)
             ]);
 
-            if (messagesRes.error) {
-                console.error('[useMessages] Messages Fetch Error:', JSON.stringify(messagesRes.error, null, 2));
-                throw new Error(`Messages: ${messagesRes.error.message}`);
-            }
-            if (questionsRes.error) {
-                console.error('[useMessages] Questions Fetch Error:', JSON.stringify(questionsRes.error, null, 2));
-                throw new Error(`Questions: ${questionsRes.error.message}`);
-            }
+            if (msgSender.error) throw new Error(`Messages (S): ${msgSender.error.message}`);
+            if (msgRecipient.error) throw new Error(`Messages (R): ${msgRecipient.error.message}`);
+            if (qUser.error) throw new Error(`Questions (U): ${qUser.error.message}`);
+            if (qOrganizer.error) throw new Error(`Questions (O): ${qOrganizer.error.message}`);
 
-            console.log(`[useMessages] Fetched ${messagesRes.data?.length || 0} messages and ${questionsRes.data?.length || 0} questions`);
+            const allMsgData = [...(msgSender.data || []), ...(msgRecipient.data || [])];
+            const allQData = [...(qUser.data || []), ...(qOrganizer.data || [])];
+
+            // Filter out exact duplicates (though IDs should be unique)
+            const uniqueMsgData = Array.from(new Map(allMsgData.map(m => [m.id, m])).values());
+            const uniqueQData = Array.from(new Map(allQData.map(q => [q.id, q])).values());
+
+            console.log(`[useMessages] Fetched ${uniqueMsgData.length} unique messages and ${uniqueQData.length} unique questions`);
 
             // Normalize questions to DBMessage format
-            const normalizedQuestions: DBMessage[] = (questionsRes.data || []).flatMap(q => {
+            const normalizedQuestions: DBMessage[] = (uniqueQData || []).flatMap(q => {
                 const msgs: DBMessage[] = [];
 
                 // The question itself
@@ -140,7 +142,7 @@ export function useMessages() {
 
             // Combine messages and sorted by created_at desc
             const allMessages = [
-                ...(messagesRes.data || []),
+                ...uniqueMsgData,
                 ...normalizedQuestions
             ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 

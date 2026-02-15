@@ -248,15 +248,14 @@ export default function HomeScreen() {
   );
 
   const getEventKey = useCallback((event: any) => {
-    return (
-      event.id ||
-      [
-        event.title || "",
-        event.rawDate || "",
-        event.time || "",
-        (event.location || "").toLowerCase(),
-      ].join("|")
-    );
+    // For recurring events, we MUST include the date to distinguish occurrences
+    const baseId = event.id || [
+      event.title || "",
+      event.time || "",
+      (event.location || "").toLowerCase(),
+    ].join("|");
+    
+    return event.isRecurring ? `${baseId}|${event.rawDate}` : baseId;
   }, []);
 
   const uniqueEvents = useMemo(() => {

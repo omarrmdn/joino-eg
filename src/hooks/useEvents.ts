@@ -189,7 +189,7 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
         if (!userId) return;
         const { data } = await supabase
           .from("users")
-          .select("interested_tags,currency_code,currency_auto_detected")
+          .select("interested_tags,currency_code,currency_auto_detected,country_code")
           .eq("id", userId)
           .maybeSingle();
 
@@ -206,10 +206,14 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
 
         // If currency is missing OR it's set to auto-detect, verify/update it
         if (!userCurrencyCode || data?.currency_auto_detected) {
+          // Use stored country_code if available, otherwise fallback to locale
+          const detectionCountry = data?.country_code || getCountryCodeFromLocale();
+          console.log(`💰 Detecting currency for country: ${detectionCountry}`);
+
           const detected = await autoDetectAndUpdateUserCurrency(
             supabase,
             userId,
-            getCountryCodeFromLocale(),
+            detectionCountry,
           );
           console.log("💰 Auto-detected currency result:", detected);
           if (detected) {
@@ -397,17 +401,15 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
           // Filter by Gender
           if (gender && gender !== 'all' && event.gender && event.gender !== 'all' && event.gender !== gender) return false;
 
-          // Filter by Distance (if location provided)
+          // RELAXED: Don't filter out by distance on the main feed, just calculate it
+          // Proximity is handled by the sorting logic (performClientSidePersonalization)
           if (activeLocation) {
             const hasLoc = event.latitude !== null && event.latitude !== undefined && event.longitude !== null && event.longitude !== undefined;
             if (hasLoc) {
               const dist = getDistance(activeLocation.latitude, activeLocation.longitude, event.latitude, event.longitude);
-              if (dist > 50) return false; // Default 50km radius for search
-            } else if (detectedArea) {
-              // Fallback to city name filter if coordinates missing on event
-              const cityLower = detectedArea.toLowerCase();
-              const eventLocLower = (event.location || "").toLowerCase();
-              if (!eventLocLower.includes(cityLower)) return false;
+              event.distance = dist;
+              // We only apply strict radius if it's NOT the personalized home feed
+              if (!personalized && dist > 100) return false;
             }
           }
 
@@ -420,9 +422,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
             if (rateToUser !== null) {
               const priceInUserCurrency = eventPrice * rateToUser;
               if (priceInUserCurrency > maxPrice) return false;
-            } else {
-              // Fallback if rate missing: compare raw values if currencies match
-              if (eventCode === currencyContext.userCurrencyCode && eventPrice > maxPrice) return false;
             }
           }
 
@@ -448,14 +447,14 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
       // Extra pass to catch duplicate rows with different ids but same content
       const seenContent = new Set<string>();
       const uniqueEvents = uniqueById.filter((event) => {
-        const contentKey = [
-          (event.title || "").toLowerCase(),
-          event.rawDate || "",
+        // For recurring events, we MUST include the date to distinguish occurrences
+        const baseId = event.id || [
+          event.title || "",
           event.time || "",
           (event.location || "").toLowerCase(),
-          event.organizerId || "",
-          event.parentEventId || "",
         ].join("|");
+        const contentKey = event.isRecurring ? `${baseId}|${event.rawDate}` : baseId;
+
         if (seenContent.has(contentKey)) return false;
         seenContent.add(contentKey);
         return true;
