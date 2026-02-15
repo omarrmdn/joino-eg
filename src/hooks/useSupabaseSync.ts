@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/clerk-expo";
 import { useEffect } from "react";
 import { useSupabaseClient } from "../lib/supabaseConfig";
-import { autoDetectAndUpdateUserCurrency, getCountryCodeFromLocale } from "../utils/currency";
+import { autoDetectAndUpdateUserCurrency } from "../utils/currency";
 import { getGeoInfoByIP } from "../utils/ip";
 
 
@@ -79,7 +79,7 @@ export function useSupabaseSync() {
           await autoDetectAndUpdateUserCurrency(
             supabase,
             user.id,
-            ipCountry || getCountryCodeFromLocale(),
+            ipCountry,
           );
         }
       } catch (currencyError) {

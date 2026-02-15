@@ -273,7 +273,8 @@ export type TranslationKey =
   | "recurrence_weekly"
   | "recurrence_biweekly"
   | "recurrence_monthly"
-  | "recurrence_every";
+  | "recurrence_every"
+  | "event_cancellation_reason_organizer_deleted";
 
 type Translations = Record<Language, Record<TranslationKey, string>>;
 
@@ -315,7 +316,7 @@ export const translations: Translations = {
     edit_event_title: "Edit Event",
     create_event_banner_hint: "Add Banner *",
     create_event_image_size_hint: "Recommended: 1200 × 900 px (4:3 ratio)",
-    create_event_title_placeholder: "Event Title *",
+    create_event_title_placeholder: "Event Title",
     create_event_description_placeholder: "Description (Optional)",
     create_event_type_label: "Event Type *",
     create_event_online: "Online",
@@ -537,6 +538,7 @@ export const translations: Translations = {
     recurrence_biweekly: "Bi-weekly",
     recurrence_monthly: "Monthly",
     recurrence_every: "Every",
+    event_cancellation_reason_organizer_deleted: "Event deleted by organizer",
   },
   ar: {
     tab_home: "الرئيسية",
@@ -575,7 +577,7 @@ export const translations: Translations = {
     edit_event_title: "تعديل الفعالية",
     create_event_banner_hint: "أضف صورة *",
     create_event_image_size_hint: "الحجم المُوصى به: ١٢٠٠ × ٩٠٠ بكسل (نسبة ٤:٣)",
-    create_event_title_placeholder: "عنوان الفعالية *",
+    create_event_title_placeholder: "عنوان الفعالية",
     create_event_description_placeholder: "الوصف (اختياري)",
     create_event_type_label: "نوع الفعالية *",
     create_event_online: "أونلاين",
@@ -797,6 +799,7 @@ export const translations: Translations = {
     recurrence_biweekly: "كل أسبوعين",
     recurrence_monthly: "شهريًا",
     recurrence_every: "كل",
+    event_cancellation_reason_organizer_deleted: "تم حذف الفعالية بواسطة المنظم",
   },
   "ar-EG": {
     tab_home: "الرئيسية",
@@ -835,7 +838,7 @@ export const translations: Translations = {
     edit_event_title: "تعديل الإيفنت",
     create_event_banner_hint: "أضف صورة *",
     create_event_image_size_hint: "الحجم المُوصى: ١٢٠٠ × ٩٠٠ بكسل (نسبة ٤:٣)",
-    create_event_title_placeholder: "عنوان الإيفنت *",
+    create_event_title_placeholder: "عنوان الإيفنت",
     create_event_description_placeholder: "الوصف (اختياري)",
     create_event_type_label: "نوع الإيفنت *",
     create_event_online: "أونلاين",
@@ -1057,6 +1060,7 @@ export const translations: Translations = {
     recurrence_biweekly: "كل أسبوعين",
     recurrence_monthly: "شهريًا",
     recurrence_every: "كل",
+    event_cancellation_reason_organizer_deleted: "الإيفنت اتمسح من المنظم",
   },
 };
 

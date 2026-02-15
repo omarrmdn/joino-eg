@@ -45,6 +45,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     markAllAsRead();
     notificationManager.setHasUnreadNotifications(false);
+    notificationManager.setHasUnreadEvents(false);
   }, [markAllAsRead]);
 
   const onRefresh = React.useCallback(async () => {

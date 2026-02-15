@@ -415,66 +415,88 @@ export async function detectCurrencyCodeByCountry(
   }
 }
 
+/**
+ * Auto-detect and update user currency based on IP country ONLY.
+ * The detected IP country is saved in the DB. Currency is only
+ * re-detected when the IP country changes from what's stored.
+ *
+ * @param ipCountryCode - Country code detected from the user's IP address
+ */
 export async function autoDetectAndUpdateUserCurrency(
   supabase: SupabaseClient,
   userId: string,
-  countryCode?: string | null,
+  ipCountryCode?: string | null,
 ): Promise<string | null> {
-  const normalizedCountry = normalizeCountryCode(countryCode);
   if (!userId) return null;
 
   try {
     const { data: userRow, error } = await supabase
       .from("users")
-      .select("currency_code,currency_auto_detected,country_code,last_location")
+      .select("currency_code,currency_auto_detected,country_code")
       .eq("id", userId)
       .maybeSingle();
 
     if (error || !userRow) return null;
+
+    // If user manually set their currency (not auto-detected), respect it.
     if (userRow.currency_auto_detected === false && userRow.currency_code) {
       return normalizeCurrencyCode(userRow.currency_code);
     }
 
-    // Try Supabase Edge Function first (server-side IP detection)
-    console.log("[currency] Invoking detect-currency Edge Function...");
+    const savedCountry = normalizeCountryCode(userRow.country_code);
+    const newCountry = normalizeCountryCode(ipCountryCode);
+
+    // If we already have a currency AND the IP country hasn't changed, skip detection.
+    if (userRow.currency_code && savedCountry && savedCountry === newCountry) {
+      console.log(`[currency] Country unchanged (${savedCountry}), skipping re-detection.`);
+      return normalizeCurrencyCode(userRow.currency_code);
+    }
+
+    // --- Country changed or currency not set yet, re-detect ---
+
+    // 1. Try using the IP country code directly
+    if (newCountry) {
+      console.log(`[currency] IP country detected: ${newCountry} (saved: ${savedCountry}). Detecting currency...`);
+      const detected = await detectCurrencyCodeByCountry(supabase, newCountry);
+      if (detected) {
+        const updates: Record<string, any> = {
+          currency_code: detected,
+          country_code: newCountry,
+          currency_auto_detected: true,
+          currency_updated_at: new Date().toISOString(),
+        };
+        await supabase.from("users").update(updates).eq("id", userId);
+        console.log(`[currency] Updated currency to ${detected} for country ${newCountry}`);
+        return detected;
+      }
+    }
+
+    // 2. Fallback: Try Supabase Edge Function (server-side IP detection)
+    console.log("[currency] IP country not available, trying Edge Function...");
     try {
       const { data: funcData, error: funcError } = await supabase.functions.invoke('detect-currency');
 
-      if (!funcError && funcData?.currency) {
-        console.log(`[currency] Edge Function detected: ${funcData.currency} (${funcData.country})`);
-        // The Edge Function updates the user profile automatically if authenticated.
+      if (!funcError && funcData?.currency && funcData?.country) {
+        const edgeCountry = normalizeCountryCode(funcData.country);
+        console.log(`[currency] Edge Function detected: ${funcData.currency} (${edgeCountry})`);
+
+        // Save the Edge Function result
+        const updates: Record<string, any> = {
+          currency_code: funcData.currency,
+          currency_auto_detected: true,
+          currency_updated_at: new Date().toISOString(),
+        };
+        if (edgeCountry) updates.country_code = edgeCountry;
+        await supabase.from("users").update(updates).eq("id", userId);
+
         return funcData.currency;
-      } else {
-        console.warn("[currency] Edge Function returned error or no data:", funcError);
       }
     } catch (edgeErr) {
       console.warn("[currency] Edge Function invocation exception:", edgeErr);
     }
 
-    // Fallback: Use provided countryCode or user's existing country_code/location
-    let resolvedCountry = normalizedCountry || normalizeCountryCode(userRow.country_code);
-
-    if (!resolvedCountry) {
-      const inferred = inferCountryCodeFromLocation(userRow.last_location);
-      resolvedCountry = normalizeCountryCode(inferred);
-    }
-
-    if (!resolvedCountry) return null;
-
-    const detected = await detectCurrencyCodeByCountry(supabase, resolvedCountry);
-    if (!detected) return null;
-
-    const updates: Record<string, any> = {};
-    if (detected !== userRow.currency_code) updates.currency_code = detected;
-    if (resolvedCountry !== userRow.country_code)
-      updates.country_code = resolvedCountry;
-    if (Object.keys(updates).length > 0) {
-      updates.currency_auto_detected = true;
-      updates.currency_updated_at = new Date().toISOString();
-      await supabase.from("users").update(updates).eq("id", userId);
-    }
-
-    return detected;
+    // 3. If no IP info at all, keep whatever the user already has
+    return normalizeCurrencyCode(userRow.currency_code) || null;
   } catch {
     return null;
   }

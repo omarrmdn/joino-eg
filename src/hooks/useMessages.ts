@@ -81,10 +81,22 @@ export function useMessages() {
                     .eq('organizer_id', user.id)
             ]);
 
-            if (msgSender.error) throw new Error(`Messages (S): ${msgSender.error.message}`);
-            if (msgRecipient.error) throw new Error(`Messages (R): ${msgRecipient.error.message}`);
-            if (qUser.error) throw new Error(`Questions (U): ${qUser.error.message}`);
-            if (qOrganizer.error) throw new Error(`Questions (O): ${qOrganizer.error.message}`);
+            if (msgSender.error) {
+                console.error(`[useMessages] sender_id query failed for user ${user.id}:`, msgSender.error);
+                throw new Error(`MSG_S: ${msgSender.error.message}`);
+            }
+            if (msgRecipient.error) {
+                console.error(`[useMessages] recipient_id query failed for user ${user.id}:`, msgRecipient.error);
+                throw new Error(`MSG_R: ${msgRecipient.error.message}`);
+            }
+            if (qUser.error) {
+                console.error(`[useMessages] question user_id query failed for user ${user.id}:`, qUser.error);
+                throw new Error(`QUEST_U: ${qUser.error.message}`);
+            }
+            if (qOrganizer.error) {
+                console.error(`[useMessages] question organizer_id query failed for user ${user.id}:`, qOrganizer.error);
+                throw new Error(`QUEST_O: ${qOrganizer.error.message}`);
+            }
 
             const allMsgData = [...(msgSender.data || []), ...(msgRecipient.data || [])];
             const allQData = [...(qUser.data || []), ...(qOrganizer.data || [])];

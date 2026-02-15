@@ -20,6 +20,7 @@ import {
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+    notifyEventCancellation,
     notifyEventLinkUpdate
 } from "../../notification/eventNotifications";
 import notificationService from "../../notification/notificationService";
@@ -674,6 +675,8 @@ export default function AddScreen() {
       setLocationSuggestions([]);
       setShowLocationSuggestions(false);
       setSelectedLocationCoords(null);
+      // Clear editId from params to exit edit mode if we were in it
+      router.setParams({ editId: undefined });
     };
 
     const handleDelete = async () => {
@@ -691,6 +694,22 @@ export default function AddScreen() {
             onPress: async () => {
               setIsLoading(true);
               try {
+                // 1. Notify attendees before deletion (requires event details)
+                const { data: eventData } = await supabase
+                  .from("events")
+                  .select("title")
+                  .eq("id", editId)
+                  .single();
+                  
+                if (eventData) {
+                   await notifyEventCancellation(
+                      supabase,
+                      editId,
+                      t("event_cancellation_reason_organizer_deleted") || "Organizer deleted the event"
+                   );
+                }
+
+                // 2. Delete the event
                 const { error } = await supabase
                   .from("events")
                   .delete()
@@ -699,6 +718,8 @@ export default function AddScreen() {
                 if (error) throw error;
                 trackAction("delete_event", { eventId: editId });
                 notificationManager.setHasUnreadEvents(true);
+                
+                resetForm(); // This will also clear editId param
                 router.replace("/(tabs)");
               } catch (err: any) {
                 console.error("Delete error:", err);
