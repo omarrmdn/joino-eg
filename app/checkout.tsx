@@ -3,11 +3,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -46,6 +46,44 @@ export default function CheckoutScreen() {
       });
 
       if (joinError && joinError.code !== "23505") throw joinError;
+
+      // Update User Spend and Organizer Revenue
+      try {
+        const { data: eventData } = await supabase
+          .from("events")
+          .select("price, organizer_id")
+          .eq("id", eventId)
+          .single();
+
+        if (eventData && eventData.price > 0) {
+          const eventPrice = Number(eventData.price);
+
+          // 1. Update Attendee Spend
+          const { data: attendeeData } = await supabase
+            .from("users")
+            .select("total_spend")
+            .eq("id", user.id)
+            .single();
+          
+          const newSpend = Number(((attendeeData?.total_spend || 0) + eventPrice).toFixed(2));
+          await supabase.from("users").update({ total_spend: newSpend }).eq("id", user.id);
+
+          // 2. Update Organizer Revenue
+          if (eventData.organizer_id) {
+            const { data: orgData } = await supabase
+              .from("users")
+              .select("total_revenue")
+              .eq("id", eventData.organizer_id)
+              .single();
+            
+            const newRevenue = Number(((orgData?.total_revenue || 0) + eventPrice).toFixed(2));
+            await supabase.from("users").update({ total_revenue: newRevenue }).eq("id", eventData.organizer_id);
+          }
+          console.log(`[Checkout] Analytics updated: Spend +${eventPrice} for ${user.id}`);
+        }
+      } catch (analyticsErr) {
+        console.error("Failed to update analytics after payment:", analyticsErr);
+      }
 
       notificationManager.setHasUnreadNotifications(true);
       notificationManager.setHasUnreadEvents(true);

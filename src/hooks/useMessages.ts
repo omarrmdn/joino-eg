@@ -47,6 +47,7 @@ export function useMessages() {
 
     const fetchMessages = useCallback(async (isInitial = true) => {
         if (!user) {
+            console.log('[useMessages] No user found, skipping fetch');
             setLoading(false);
             return;
         }
@@ -54,6 +55,7 @@ export function useMessages() {
         try {
             if (isInitial) setLoading(true);
             setError(null);
+            console.log(`[useMessages] Fetching for user: ${user.id} (${user.fullName})`);
 
             // Fetch messages where user is sender or recipient
             const [messagesRes, questionsRes] = await Promise.all([
@@ -79,8 +81,16 @@ export function useMessages() {
                     .order('created_at', { ascending: false })
             ]);
 
-            if (messagesRes.error) throw messagesRes.error;
-            if (questionsRes.error) throw questionsRes.error;
+            if (messagesRes.error) {
+                console.error('[useMessages] Messages Fetch Error:', messagesRes.error);
+                throw messagesRes.error;
+            }
+            if (questionsRes.error) {
+                console.error('[useMessages] Questions Fetch Error:', questionsRes.error);
+                throw questionsRes.error;
+            }
+
+            console.log(`[useMessages] Fetched ${messagesRes.data?.length || 0} messages and ${questionsRes.data?.length || 0} questions`);
 
             // Normalize questions to DBMessage format
             const normalizedQuestions: DBMessage[] = (questionsRes.data || []).flatMap(q => {
@@ -129,13 +139,14 @@ export function useMessages() {
 
             // Combine messages and sorted by created_at desc
             const allMessages = [
-                ...(messagesRes.data || []).filter(m => !(m.sender_id === m.recipient_id && m.message_type === 'event_link')),
+                ...(messagesRes.data || []),
                 ...normalizedQuestions
             ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
+            console.log(`[useMessages] Combined into ${allMessages.length} total message units for display`);
             setMessages(allMessages);
         } catch (err) {
-            console.error('Error fetching messages:', err);
+            console.error('[useMessages] error fetching messages:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch messages');
         } finally {
             if (isInitial) setLoading(false);

@@ -1,14 +1,17 @@
 import { useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  FlatList,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MessageItem } from "../../../src/components/MessageItem";
 import { Colors } from "../../../src/constants/Colors";
@@ -40,6 +43,7 @@ type Conversation = {
   avatar: string | null;
   otherUserId: string;
   lastEventId: string | null;
+  eventOrganizerId: string | null;
   messages: ConversationMessage[];
 };
 
@@ -105,7 +109,7 @@ const formatTimeForList = (dateString: string, t: (key: any) => string, locale: 
 export default function MessagesScreen() {
   const { user } = useUser();
   const { t, language } = useLanguage();
-  const { messages, loading, sendMessage, markAsRead, markAllAsRead } = useMessages();
+  const { messages, loading, error, refetch, markAsRead, markAllAsRead } = useMessages();
   const router = useRouter();
 
   useEffect(() => {
@@ -184,6 +188,22 @@ export default function MessagesScreen() {
                 <ActivityIndicator size="large" color={Colors.primary} />
             </View>
         );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#FF3B30" style={{ marginBottom: 16 }} />
+          <Text style={styles.emptyText}>{t("error_title") || "Error"}</Text>
+          <Text style={styles.emptySubText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={() => refetch()}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
 
     if (conversations.length === 0) {
@@ -271,5 +291,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Fonts.regular,
     textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  retryText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontFamily: Fonts.bold,
   },
 });

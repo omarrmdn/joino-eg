@@ -92,14 +92,15 @@ export async function notifyAttendeeEventAccessDetails(
         : `This is an onsite event, but the organizer hasn't added a specific location yet.`;
     }
 
-    // Send push notification (triggers message creation via Edge Function if applicable)
-    // Note: create_message flag tells the backend to insert a message into the inbox
+    // Send push notification (triggers message creation via Edge Function)
+    // Always create a message for the inbox so the user has a record of the location/link
     const finalData = {
       ...notificationData,
-      create_message: isOnline && hasLink && !!event.organizer_id,
+      create_message: true, // Always create a message record
       sender_id: event.organizer_id,
+      recipient_id: attendeeId,
       message_type: 'event_link' as const,
-      message_body: body, // Use the localized body
+      message_body: body,
       message_subject: title,
       link: event.link
     };
@@ -470,12 +471,23 @@ export async function notifyEventCancellation(
       cancellation_reason: reason,
     };
 
+    // Get organizer ID to avoid double notification
+    const { data: eventDetails } = await client
+      .from('events')
+      .select('organizer_id')
+      .eq('id', eventId)
+      .single();
+    const organizerId = eventDetails?.organizer_id;
+
     let notified = 0;
     for (const attendee of attendees || []) {
+      // Don't notify organizer again if they are in the attendees list
+      if (attendee.user_id === organizerId) continue;
+
       const result = await createNotification(
         client,
         attendee.user_id,
-        'attendee_cancel', // Reusing this type or we could add a new one if schema allows
+        'event_canceled',
         title,
         body,
         notificationData
@@ -485,20 +497,13 @@ export async function notifyEventCancellation(
 
     // Also notify the organizer (self) - Confirmation
     try {
-      const { data: eventDetails } = await client
-        .from('events')
-        .select('organizer_id')
-        .eq('id', eventId)
-        .single();
-
-      if (eventDetails?.organizer_id) {
+      if (organizerId) {
         await createNotification(
           client,
-          eventDetails.organizer_id,
-          'attendee_cancel',
+          organizerId,
+          'event_canceled',
           title,
-          t('notification_attendee_cancel_confirmation_body', { title: event.title }),
-
+          t('event_cancel_success'),
           notificationData,
           true // Send local notification immediately
         );

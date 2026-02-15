@@ -3,6 +3,7 @@
 export type NotificationType =
   | 'new_attendee'
   | 'attendee_cancel'
+  | 'event_canceled'
   | 'reminder_12hr'
   | 'reminder_2hr'
   | 'event_access'

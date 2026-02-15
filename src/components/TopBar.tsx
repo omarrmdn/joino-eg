@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.black,
     borderRadius: 25,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7.5,
     height: 50,
     borderWidth: 1,
     borderColor: Colors.gray,
@@ -116,12 +116,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchIconLtr: {
-    marginLeft: 8,
-    marginRight: 8,
+    marginStart: 4,
+    marginEnd: 8,
   },
   searchIconRtl: {
-    marginRight: 8,
-    marginLeft: 8,
+    marginStart: 4,
+    marginEnd: 8,
   },
   input: {
     flex: 1,
@@ -139,7 +139,8 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginStart: 7.5,
+    marginEnd: 0,
   },
   notificationBubble: {
     position: 'absolute',

@@ -58,6 +58,7 @@ export default function NotificationsScreen() {
       case "new_attendee":
         return "people-outline";
       case "attendee_cancel":
+      case "event_canceled":
         return "close-circle-outline";
       case "reminder_12hr":
       case "reminder_2hr":

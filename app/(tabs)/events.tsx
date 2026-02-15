@@ -1,7 +1,7 @@
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -186,6 +186,16 @@ export default function EventsScreen() {
       setLoading(false);
     }
   };
+
+  const { useFocusEffect } = require("expo-router");
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        console.log("📅 [EventsScreen] Refetching on focus..."); // Fixed symbol to match screen
+        fetchMyEvents();
+      }
+    }, [loading])
+  );
 
   useEffect(() => {
     notificationManager.setHasUnreadEvents(false);

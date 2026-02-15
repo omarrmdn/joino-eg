@@ -21,23 +21,37 @@ export function useNotifications() {
 
   // Fetch notifications from database
   const fetchNotifications = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log("[useNotifications] No userId found, skipping fetch");
+      setLoading(false);
+      return;
+    }
 
     try {
-      // FIXED: Explicitly cast to text to prevent UUID casting
+      console.log(`[useNotifications] Fetching notifications for user: ${userId}`);
+
+      // DEBUG: Check if RLS is blocking everything
+      try {
+        const { data: debugData, error: debugError } = await supabase.from("notifications").select("id").limit(1);
+        console.log(`[useNotifications] RLS Debug - can see any notifications? ${debugData && debugData.length > 0 ? "Yes" : "No"} (Error: ${debugError?.message || "none"})`);
+      } catch (e) {
+        console.warn("[useNotifications] Debug query failed:", e);
+      }
+
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", userId)  // No casting - let Supabase handle it as text
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) {
-        console.error("Error fetching notifications:", error);
+        console.error("[useNotifications] Supabase error:", error);
         throw error;
       }
 
-      console.log(`Fetched ${data?.length || 0} notifications for user ${userId}`);
+      console.log(`[useNotifications] Success! Fetched ${data?.length || 0} notifications`);
+
       setNotifications(data || []);
       const unread = data?.filter((n) => !n.read).length || 0;
       setUnreadCount(unread);
@@ -46,8 +60,7 @@ export function useNotifications() {
       // Update badge count
       await notificationService.setBadgeCount(unread);
     } catch (error: any) {
-      console.error("Error fetching notifications:", error);
-      // Don't throw - just set loading to false
+      console.error("[useNotifications] Fatal error in fetchNotifications:", error);
     } finally {
       setLoading(false);
     }

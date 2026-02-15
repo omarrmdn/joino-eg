@@ -19,6 +19,9 @@ import {
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+    notifyEventLinkUpdate
+} from "../../notification/eventNotifications";
 import notificationService from "../../notification/notificationService";
 import { Button } from "../../src/components/Button";
 import { PromotedButton } from "../../src/components/PromotedButton";
@@ -1099,7 +1102,7 @@ export default function AddScreen() {
             <View style={[styles.inputContainer, fieldErrors.title && styles.inputError]}>
               <TextInput
                 style={styles.input}
-                placeholder={t("create_event_title_placeholder")}
+                placeholder={t("create_event_title_placeholder") + " *"}
                 placeholderTextColor={fieldErrors.title ? Colors.error : Colors.gray}
                 value={title}
                 onChangeText={(text) => { setTitle(text); if (fieldErrors.title) setFieldErrors(prev => { const n = {...prev}; delete n.title; return n; }); }}
@@ -1237,7 +1240,7 @@ export default function AddScreen() {
                   >
                     {startDate
                       ? startDate.toLocaleDateString()
-                      : t("create_event_start_date")}
+                      : t("create_event_start_date") + " *"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1260,7 +1263,7 @@ export default function AddScreen() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : t("create_event_time")}
+                      : t("create_event_time") + " *"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1423,7 +1426,7 @@ export default function AddScreen() {
             <View style={[styles.inputContainer, fieldErrors.tags && styles.inputError]}>
               <TextInput
                 style={styles.input}
-                placeholder={t("create_event_tags_placeholder")}
+                placeholder={t("create_event_tags_placeholder") + " *"}
                 placeholderTextColor={fieldErrors.tags ? Colors.error : Colors.gray}
                 value={tagInput}
                 onChangeText={handleTagInputChange}

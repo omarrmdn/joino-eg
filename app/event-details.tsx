@@ -193,20 +193,13 @@ export default function EventDetailsScreen() {
   }, [eventData, user?.id, supabase]);
 
   const handleJoin = React.useCallback(async () => {
+    if (isJoining || isAttending) return;
+
     if (!user || !eventData) {
       showAlert({
         title: "Error",
         message: "You must be logged in to join events",
         type: 'error',
-      });
-      return;
-    }
-
-    if (isAttending) {
-      showAlert({
-        title: "Info",
-        message: "You are already attending this event.",
-        type: 'info',
       });
       return;
     }
@@ -228,23 +221,6 @@ export default function EventDetailsScreen() {
       });
       return;
     }
-
-    // Check if event is paid - DEACTIVATED FOR NOW
-    /*
-    const eventPrice = parseCurrencyNumber(eventData.price);
-    if (eventPrice > 0) {
-      // Redirect to checkout
-      router.push({
-        pathname: "/checkout" as any,
-        params: {
-          cost: eventPrice,
-          currency: eventData.currencyCode || "EGP", // Fallback to EGP if not found
-          eventId: eventData.id,
-        }
-      });
-      return;
-    }
-    */
 
     setIsJoining(true);
     trackAction("initiate_join", { eventId: eventData.id, title: eventData.title });
@@ -278,23 +254,41 @@ export default function EventDetailsScreen() {
           );
         }
         
-        // Send event access details (online link or onsite location) to the attendee
+        // Send event access details
         await notifyAttendeeEventAccessDetails(supabase, eventData.id, user.id);
 
-        // Update user spend
+        // Update user spend and organizer revenue
         const eventPrice = parseCurrencyNumber(eventData.price);
 
         if (eventPrice > 0) {
+          // 1. Update User Spend
           const { data: userData } = await supabase
             .from("users")
             .select("total_spend")
             .eq("id", user.id)
             .single();
 
+          const newSpend = Number(((userData?.total_spend || 0) + eventPrice).toFixed(2));
           await supabase
             .from("users")
-            .update({ total_spend: (userData?.total_spend || 0) + eventPrice })
+            .update({ total_spend: newSpend })
             .eq("id", user.id);
+
+          // 2. Update Organizer Revenue
+          if (eventData.organizerId) {
+            const { data: orgData } = await supabase
+              .from("users")
+              .select("total_revenue")
+              .eq("id", eventData.organizerId)
+              .single();
+
+            const newRevenue = Number(((orgData?.total_revenue || 0) + eventPrice).toFixed(2));
+            await supabase
+              .from("users")
+              .update({ total_revenue: newRevenue })
+              .eq("id", eventData.organizerId);
+          }
+          console.log(`[Analytics] Updated spend (+${eventPrice}) and revenue for event ${id}`);
         }
 
         notificationManager.setHasUnreadNotifications(true);
@@ -319,7 +313,7 @@ export default function EventDetailsScreen() {
     } finally {
       setIsJoining(false);
     }
-  }, [user, eventData, isAttending, supabase, id, trackAction, showAlert, notifyNewAttendee, notifyAttendeeEventAccessDetails, t]);
+  }, [user, eventData, isAttending, isJoining, isEnded, supabase, id, trackAction, showAlert, notifyNewAttendee, notifyAttendeeEventAccessDetails, t]);
 
   const handleCancelAttendance = async () => {
     setCancelType("attendance");
@@ -344,6 +338,43 @@ export default function EventDetailsScreen() {
         .eq("user_id", user.id);
 
       if (cancelError) throw cancelError;
+
+      // Update user spend and organizer revenue (decrement)
+      const eventPrice = parseCurrencyNumber(eventData.price);
+      if (eventPrice > 0) {
+        // 1. Decrement User Spend
+        const { data: userData } = await supabase
+          .from("users")
+          .select("total_spend")
+          .eq("id", user.id)
+          .single();
+
+        const currentSpend = userData?.total_spend || 0;
+        const newSpend = Number(Math.max(0, currentSpend - eventPrice).toFixed(2));
+        
+        await supabase
+          .from("users")
+          .update({ total_spend: newSpend })
+          .eq("id", user.id);
+
+        // 2. Decrement Organizer Revenue
+        if (eventData.organizerId) {
+          const { data: orgData } = await supabase
+            .from("users")
+            .select("total_revenue")
+            .eq("id", eventData.organizerId)
+            .single();
+
+          const currentRevenue = orgData?.total_revenue || 0;
+          const newRevenue = Number(Math.max(0, currentRevenue - eventPrice).toFixed(2));
+
+          await supabase
+            .from("users")
+            .update({ total_revenue: newRevenue })
+            .eq("id", eventData.organizerId);
+        }
+        console.log(`[Analytics] Decremented spend (-${eventPrice}) and revenue for event ${eventData.id}`);
+      }
 
       if (eventData.organizerId) {
         await notifyAttendeeCancellation(
@@ -1054,8 +1085,12 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
   return (
     <View style={styles.questionItem}>
       <Text style={[styles.questionText, isRTL && styles.textRtl]}>{question.question}</Text>
+      
       {hasOrganizerAnswer ? (
-        <Text style={[styles.answerText, isRTL && styles.textRtl]}>{question.answer}</Text>
+        <Text style={[styles.answerText, isRTL && styles.textRtl]}>
+          <Text style={{ fontFamily: Fonts.bold }}>{t("event_organizer_answer_prefix")}: </Text>
+          {question.answer}
+        </Text>
       ) : canAnswer ? (
         <View style={styles.answerInputRow}>
           <TextInput
@@ -1067,16 +1102,19 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
             multiline
           />
           <TouchableOpacity
-            style={styles.answerSendButton}
+            style={[styles.answerSendButton, { backgroundColor: answerText.trim() ? Colors.primary : Colors.lightblack }]}
             onPress={handleSubmit}
-            disabled={isSubmitting}
-            activeOpacity={0.8}
+            disabled={!answerText.trim() || isSubmitting}
           >
-            <Ionicons
-              name={language === "ar" || language === "ar-EG" ? "arrow-back-circle" : "arrow-forward-circle"}
-              size={24}
-              color={isSubmitting ? Colors.textSecondary : Colors.primary}
-            />
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Ionicons
+                name={language === "ar" ? "arrow-back" : "arrow-forward"}
+                size={16}
+                color={Colors.white}
+              />
+            )}
           </TouchableOpacity>
         </View>
       ) : null}

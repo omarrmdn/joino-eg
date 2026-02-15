@@ -1084,26 +1084,30 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         if (saved && (saved === "en" || saved === "ar" || saved === "ar-EG")) {
           setLanguageState(saved as Language);
         } else {
-          // prioritized IP based detection instead of system location
-          console.log("[i18n] Detecting country by IP...");
-          const geo = await getGeoInfoByIP();
-          const ipCountry = geo?.country;
-          console.log(`[i18n] IP Country: ${ipCountry}`);
-
-          const isEgypt = ipCountry === "EG";
+          // Check phone locale FIRST as it's the strongest indicator of user preference
+          const locales = Localization.getLocales();
+          const firstLocale = locales[0];
+          const localeStr = firstLocale?.languageTag || firstLocale?.languageCode || "";
           
-          if (isEgypt) {
-            console.log(`[i18n] User detected in Egypt by IP. Defaulting to ar-EG.`);
-            setLanguageState("ar-EG");
+          if (localeStr.startsWith("ar")) {
+            console.log(`[i18n] Arabic phone language detected (${localeStr}). Setting to ar.`);
+            setLanguageState("ar");
           } else {
-            // Fallback to locale if IP fails or isn't Egypt
-            const locales = Localization.getLocales();
-            const firstLocale = locales[0];
-            const localeStr = firstLocale?.languageTag || firstLocale?.languageCode || "";
-            
-            if (localeStr.startsWith("ar")) {
-              setLanguageState("ar");
-            } else {
+            // If phone is not Arabic, try IP-based detection for regional defaults (like Egypt)
+            console.log("[i18n] Phone language not Arabic. Checking country by IP...");
+            try {
+              const geo = await getGeoInfoByIP();
+              const ipCountry = geo?.country;
+              console.log(`[i18n] IP Country: ${ipCountry}`);
+
+              if (ipCountry === "EG") {
+                console.log(`[i18n] User detected in Egypt by IP. Defaulting to ar-EG.`);
+                setLanguageState("ar-EG");
+              } else {
+                setLanguageState("en");
+              }
+            } catch (err) {
+              console.warn("[i18n] IP detection failed, falling back to English", err);
               setLanguageState("en");
             }
           }

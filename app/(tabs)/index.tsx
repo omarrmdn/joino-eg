@@ -2,13 +2,13 @@ import { useUser } from "@clerk/clerk-expo";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    RefreshControl,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "../../src/components/EventCard";
@@ -235,6 +235,17 @@ export default function HomeScreen() {
   useEffect(() => {
     checkLocationPermission();
   }, [user?.id]); // Only re-run when user changes, not on every fetch update
+
+  // Auto-refresh when screen comes into focus to ensure fresh data without being intrusive
+  const { useFocusEffect } = require("expo-router");
+  useFocusEffect(
+    useCallback(() => {
+      if (hasLoadedOnce && !isRefreshing) {
+        console.log("🏠 [HomeScreen] Refetching on focus...");
+        refetch();
+      }
+    }, [hasLoadedOnce, isRefreshing, refetch])
+  );
 
   const getEventKey = useCallback((event: any) => {
     return (

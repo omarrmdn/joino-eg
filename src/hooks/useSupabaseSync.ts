@@ -3,6 +3,9 @@ import { useUser } from "@clerk/clerk-expo";
 import { useEffect } from "react";
 import { useSupabaseClient } from "../lib/supabaseConfig";
 import { autoDetectAndUpdateUserCurrency, getCountryCodeFromLocale } from "../utils/currency";
+import { getGeoInfoByIP } from "../utils/ip";
+
+
 
 export function useSupabaseSync() {
   const { user, isLoaded } = useUser();
@@ -26,12 +29,26 @@ export function useSupabaseSync() {
         const hasSupabaseImage = !!(existingUser?.image_url?.includes(supabaseUrl || ""));
         const finalImageUrl = hasSupabaseImage ? existingUser?.image_url : user.imageUrl;
 
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        try {
+          const geoInfo = await getGeoInfoByIP();
+          if (geoInfo?.latitude && geoInfo.longitude) {
+            latitude = geoInfo.latitude;
+            longitude = geoInfo.longitude;
+          }
+        } catch (e) {
+          console.log('[useSupabaseSync] Geolocation detection failed');
+        }
+
         const userData = {
           id: user.id,
           email: user.primaryEmailAddress?.emailAddress,
           name: user.fullName,
           image_url: finalImageUrl,
           date_signed_in: new Date().toISOString(),
+          latitude: latitude,
+          longitude: longitude,
         };
 
         if (existingUser) {
