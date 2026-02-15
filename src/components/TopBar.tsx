@@ -140,7 +140,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginStart: 7.5,
-    marginEnd: 0,
   },
   notificationBubble: {
     position: 'absolute',
