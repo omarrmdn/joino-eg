@@ -14,6 +14,7 @@ import { Colors } from "../src/constants/Colors";
 import { useTrackSession } from "../src/hooks/useTrackSession";
 import { AlertProvider } from "../src/lib/AlertContext";
 import { tokenCache } from "../src/lib/cache";
+import { CurrencyProvider } from "../src/lib/CurrencyContext";
 import { LanguageProvider, useLanguage } from "../src/lib/i18n";
 import { useSupabaseClient } from "../src/lib/supabaseConfig";
 import OnboardingScreen from "./Onboarding";
@@ -138,15 +139,17 @@ function RootLayout() {
           }}
         >
           <LanguageProvider>
-            <NotificationProvider>
-              <AlertProvider>
-                <RootContent 
-                  appIsReady={appIsReady} 
-                  showOnboarding={showOnboarding} 
-                  setShowOnboarding={setShowOnboarding}
-                />
-              </AlertProvider>
-            </NotificationProvider>
+            <CurrencyProvider>
+              <NotificationProvider>
+                <AlertProvider>
+                  <RootContent 
+                    appIsReady={appIsReady} 
+                    showOnboarding={showOnboarding} 
+                    setShowOnboarding={setShowOnboarding}
+                  />
+                </AlertProvider>
+              </NotificationProvider>
+            </CurrencyProvider>
           </LanguageProvider>
         </PostHogProvider>
       </ClerkLoaded>

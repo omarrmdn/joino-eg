@@ -28,12 +28,11 @@ import { useTags } from "../../src/hooks/useEvents";
 import { useTrackSession } from "../../src/hooks/useTrackSession";
 import { useUserAnalytics } from "../../src/hooks/useUserAnalytics";
 import { useAlert } from "../../src/lib/AlertContext";
+import { useCurrency } from "../../src/lib/CurrencyContext";
 import { useLanguage } from "../../src/lib/i18n";
 import { useSupabaseClient } from "../../src/lib/supabaseConfig";
 import {
-    CurrencyContext,
-    formatCurrencyAmount,
-    getCurrencyInfo,
+    formatCurrencyAmount
 } from "../../src/utils/currency";
 
 export default function ProfileScreen() {
@@ -47,11 +46,20 @@ export default function ProfileScreen() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [tempName, setTempName] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
-  const [currencyContext, setCurrencyContext] = useState<CurrencyContext | null>(null);
+  const { selectedCurrency, currencyInfo, exchangeRates } = useCurrency();
   const router = useRouter();
   const { t, language } = useLanguage();
   const { showAlert, showToast } = useAlert();
   const insets = useSafeAreaInsets();
+  
+  // Adapt our context to the shape expected by utils
+  const currencyContext = React.useMemo(() => ({
+    userCurrencyCode: selectedCurrency,
+    userCurrency: currencyInfo,
+    currencyByCode: { [selectedCurrency]: currencyInfo! },
+    rateToUserByCode: { [selectedCurrency]: 1 },
+    ...exchangeRates // Include other rates if needed
+  }), [selectedCurrency, currencyInfo, exchangeRates]);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,32 +68,6 @@ export default function ProfileScreen() {
     await refetch();
     setRefreshing(false);
   };
-
-  React.useEffect(() => {
-    let active = true;
-    const loadCurrency = async () => {
-      if (!userData?.currency_code) {
-        setCurrencyContext(null);
-        return;
-      }
-      const info = await getCurrencyInfo(supabase, userData.currency_code);
-      if (!active) return;
-      if (info) {
-        setCurrencyContext({
-          userCurrencyCode: info.code,
-          userCurrency: info,
-          currencyByCode: { [info.code]: info },
-          rateToUserByCode: { [info.code]: 1 },
-        });
-      } else {
-        setCurrencyContext(null);
-      }
-    };
-    loadCurrency();
-    return () => {
-      active = false;
-    };
-  }, [userData?.currency_code, supabase]);
 
   React.useEffect(() => {
     if (!user?.id) return;

@@ -15,12 +15,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../src/constants/Colors";
 import { Fonts } from "../src/constants/Fonts";
 import { useAlert } from "../src/lib/AlertContext";
+import { useCurrency } from "../src/lib/CurrencyContext";
 import { useLanguage } from "../src/lib/i18n";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useUser();
   const { language, setLanguage, t } = useLanguage();
+  const { selectedCurrency, setCurrency } = useCurrency();
   const { signOut } = useAuth();
   const { showAlert } = useAlert();
 
@@ -135,6 +137,35 @@ export default function SettingsScreen() {
 
         <View style={styles.divider} />
 
+        <Text style={styles.sectionTitle}>{t("settings_currency") || "Currency"}</Text>
+        <Text style={styles.sectionDescription}>
+          {t("settings_currency_description") || "Change the displayed currency for event prices."}
+        </Text>
+
+        <View style={styles.currencyOptions}>
+          {["EGP", "USD", "EUR", "SAR", "AED"].map((code) => (
+            <TouchableOpacity
+              key={code}
+              style={[
+                styles.currencyOption,
+                selectedCurrency === code && styles.currencyOptionActive,
+              ]}
+              onPress={() => setCurrency(code)}
+            >
+              <Text
+                style={[
+                  styles.currencyOptionText,
+                  selectedCurrency === code && styles.currencyOptionTextActive,
+                ]}
+              >
+                {code}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.divider} />
+
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={24} color={Colors.error} />
           <Text style={styles.signOutText}>{t("settings_sign_out")}</Text>
@@ -207,6 +238,33 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
     fontFamily: Fonts.regular,
+  },
+  currencyOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  currencyOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightblack,
+    alignItems: "center",
+    minWidth: 70,
+  },
+  currencyOptionActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  currencyOptionText: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontFamily: Fonts.medium,
+  },
+  currencyOptionTextActive: {
+    color: Colors.white,
   },
   divider: {
     height: 1,

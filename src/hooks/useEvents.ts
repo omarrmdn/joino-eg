@@ -1,19 +1,12 @@
 import { useUser } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
-import { EVENTS, TAGS } from "../constants/DummyData";
+import { useCurrency } from "../lib/CurrencyContext";
 import { useLanguage } from "../lib/i18n";
 import { useSupabaseClient } from "../lib/supabaseConfig";
 import { EventCardData, transformEventToCardData } from "../types/database";
-import {
-  autoDetectAndUpdateUserCurrency,
-  buildCurrencyContext,
-  DEFAULT_CURRENCY_CODE,
-  detectAndStoreIpCountry,
-  getCountryCodeFromLocale,
-} from "../utils/currency";
+import { DEFAULT_CURRENCY_CODE } from "../utils/currency";
 import { getGeoInfoByIP } from "../utils/ip";
 import { getDistance } from "../utils/location";
-
 
 // Helper to generate upcoming occurrences for recurring events
 const RECURRENCE_DAYS_AHEAD = 60;
@@ -66,7 +59,6 @@ function generateRecurringOccurrences(event: any): any[] {
           ? event.recurrence_days
           : [startDate.getDay()];
 
-      // Find the first week start on/after "from"
       const weekMs = 7 * 24 * 60 * 60 * 1000;
       const seriesStartWeekStart = new Date(startDate);
       seriesStartWeekStart.setDate(
@@ -112,7 +104,6 @@ function generateRecurringOccurrences(event: any): any[] {
     }
     case "monthly": {
       let d = new Date(startDate);
-      // Move to first occurrence on/after "from"
       while (d.getTime() < from.getTime()) {
         d.setMonth(d.getMonth() + 1);
       }
@@ -165,12 +156,14 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
     eventType,
     gender
   } = options;
+
+  const { selectedCurrency, exchangeRates, refreshRates, currencyInfo } = useCurrency();
+
   const fetchEvents = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // --- Location Detection Enhancement ---
       let activeLocation = userLocation;
       let detectedArea: string | null = null;
 
@@ -179,48 +172,21 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
         if (geoResult?.latitude && geoResult?.longitude) {
           activeLocation = { latitude: geoResult.latitude, longitude: geoResult.longitude };
           detectedArea = geoResult.city;
-          console.log(`[useEvents] Using IP location: ${detectedArea} (${activeLocation.latitude}, ${activeLocation.longitude})`);
         }
       }
 
       let userInterests: string[] = [];
-      let userCurrencyCode: string | null = null;
 
       const loadUserProfile = async () => {
         if (!userId) return;
         const { data } = await supabase
           .from("users")
-          .select("interested_tags,currency_code,currency_auto_detected,country_code")
+          .select("interested_tags")
           .eq("id", userId)
           .maybeSingle();
 
-        console.log("👤 User Profile Loaded:", data);
-
         if (data?.interested_tags) {
           userInterests = data.interested_tags;
-        }
-        if (data?.currency_code) {
-          userCurrencyCode = data.currency_code;
-        }
-
-        console.log("💰 Initial User Currency:", userCurrencyCode);
-
-        // If currency is missing OR it's set to auto-detect, verify/update it
-        if (!userCurrencyCode || data?.currency_auto_detected) {
-          // Use stored country_code if available, otherwise fallback to locale
-          const ipCountry = await detectAndStoreIpCountry();
-          const detectionCountry = ipCountry || data?.country_code || getCountryCodeFromLocale();
-          console.log(`💰 Detecting currency for country: ${detectionCountry}`);
-
-          const detected = await autoDetectAndUpdateUserCurrency(
-            supabase,
-            userId,
-            detectionCountry,
-          );
-          console.log("💰 Auto-detected currency result:", detected);
-          if (detected) {
-            userCurrencyCode = detected;
-          }
         }
       };
 
@@ -228,8 +194,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
         await loadUserProfile();
       }
 
-      // 1. Fetch all events with their tags and attendees
-      // 1. Build the base query
       let queryBuilder = supabase.from("events").select(`
                     *,
                     organizer:users!events_organizer_id_fkey (
@@ -253,21 +217,17 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
                     )
                 `);
 
-      // 2. Apply status and date filters (only show active/upcoming events)
-      const today = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
       queryBuilder = queryBuilder
         .neq('status', 'ended')
         .neq('status', 'canceled')
-        .gte('date', today);
+        .gte('date', todayStr);
 
-      // 3. Apply search logic if searchQuery is provided
       if (searchQuery && searchQuery.trim().length > 0) {
         const trimmedQuery = searchQuery.trim();
-        // Check title, location, and description for any keyword matches
         queryBuilder = queryBuilder.or(`title.ilike.%${trimmedQuery}%,location.ilike.%${trimmedQuery}%,description.ilike.%${trimmedQuery}%`);
       }
 
-      // 4. Apply additional filters if provided
       if (maxPrice !== undefined && maxPrice !== null) {
         queryBuilder = queryBuilder.lte('price', maxPrice);
       }
@@ -288,7 +248,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
 
       let resultData = data || [];
 
-      // 3. Personalize & Proximity: Use Edge Function if available, otherwise fallback to client-side logic
       if (personalized && userId) {
         try {
           const { data: personalizedData, error: funcError } = await supabase.functions.invoke('get-personalized-events', {
@@ -309,13 +268,9 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
           if (!funcError && personalizedData && Array.isArray(personalizedData)) {
             resultData = personalizedData;
           } else {
-            if (funcError) {
-              console.log(`[useEvents] Edge function notice: ${funcError.message || 'Unauthorized or not configured'}`);
-            }
             await performClientSidePersonalization();
           }
         } catch (e) {
-          console.warn("Edge function call failed, falling back to client-side personalization:", e);
           await performClientSidePersonalization();
         }
       } else {
@@ -323,7 +278,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
       }
 
       async function performClientSidePersonalization() {
-        // Expand recurring events into upcoming occurrences
         const expandedEvents: any[] = [];
         for (const ev of resultData as any[]) {
           if (ev?.is_recurring) {
@@ -333,7 +287,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
           }
         }
 
-        // Sort by interest match and distance
         if ((personalized && userInterests.length > 0) || userLocation) {
           expandedEvents.sort((a: any, b: any) => {
             let interestScoreA = 0;
@@ -364,7 +317,6 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
                 ? getDistance(activeLocation.latitude, activeLocation.longitude, b.latitude, b.longitude)
                 : 1000;
 
-              // Prioritize same area/city name if detected
               if (detectedArea) {
                 const cityLower = detectedArea.toLowerCase();
                 const aLocLower = (a.location || "").toLowerCase();
@@ -374,103 +326,73 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
               }
             }
 
-            const scoreA = interestScoreA + distanceA;
-            const scoreB = interestScoreB + distanceB;
-
-            return scoreA - scoreB;
+            return (interestScoreA + distanceA) - (interestScoreB + distanceB);
           });
         }
         resultData = expandedEvents;
       }
 
-      // 4. Build currency context for formatting and filtering
-      const eventCurrencyCodes = (resultData || [])
-        .map((event: any) => event?.currency_code)
-        .filter(Boolean);
-      const currencyContext = await buildCurrencyContext(
-        supabase,
-        userCurrencyCode,
-        eventCurrencyCodes,
-      );
+      const eventCodes = Array.from(new Set(resultData.map((e: any) => e.currency_code).filter(Boolean))) as string[];
+      if (eventCodes.length > 0) {
+        const needed = eventCodes.filter(c => c !== selectedCurrency && !exchangeRates[c]);
+        if (needed.length > 0) await refreshRates(needed);
+      }
 
-      // 5. Apply manual filters that might have been missed by DB/Function (especially maxPrice across currencies)
+      const currencyContext = {
+        userCurrencyCode: selectedCurrency,
+        userCurrency: currencyInfo,
+        currencyByCode: { [selectedCurrency]: currencyInfo! },
+        rateToUserByCode: { [selectedCurrency]: 1, ...exchangeRates },
+      };
+
       if (maxPrice !== undefined || eventType !== 'all' || (gender && gender !== 'all') || userLocation) {
         resultData = resultData.filter((event: any) => {
-          // Filter by Event Type
           if (eventType === 'online' && !event.is_online) return false;
           if (eventType === 'onsite' && event.is_online) return false;
-
-          // Filter by Gender
           if (gender && gender !== 'all' && event.gender && event.gender !== 'all' && event.gender !== gender) return false;
 
-          // RELAXED: Don't filter out by distance on the main feed, just calculate it
-          // Proximity is handled by the sorting logic (performClientSidePersonalization)
           if (activeLocation) {
             const hasLoc = event.latitude !== null && event.latitude !== undefined && event.longitude !== null && event.longitude !== undefined;
             if (hasLoc) {
               const dist = getDistance(activeLocation.latitude, activeLocation.longitude, event.latitude, event.longitude);
               event.distance = dist;
-              // We only apply strict radius if it's NOT the personalized home feed
               if (!personalized && dist > 100) return false;
             }
           }
 
-          // Filter by Max Price (handling multiple currencies)
           if (maxPrice !== undefined && maxPrice !== null) {
             const eventPrice = event.price || 0;
             const eventCode = event.currency_code || DEFAULT_CURRENCY_CODE;
-            const rateToUser = currencyContext.rateToUserByCode[eventCode] ?? (eventCode === currencyContext.userCurrencyCode ? 1 : null);
-
-            if (rateToUser !== null) {
-              const priceInUserCurrency = eventPrice * rateToUser;
-              if (priceInUserCurrency > maxPrice) return false;
+            const rate = currencyContext.rateToUserByCode[eventCode];
+            if (rate !== undefined) {
+              if (eventPrice * rate > maxPrice) return false;
             }
           }
-
           return true;
         });
       }
 
-      // 6. Map Supabase data to EventCardData format
       const mappedEvents = resultData.map((event: any) =>
         transformEventToCardData(event, userId, language, currencyContext),
       );
 
-      // 7. De-duplicate events to prevent repeat cards
       const seen = new Set<string>();
-      const uniqueById = mappedEvents.filter((event) => {
-        const baseId = event.parentEventId || event.id;
-        const key = `${baseId}|${event.rawDate || ""}|${event.time || ""}`;
+      const uniqueEvents = mappedEvents.filter((event) => {
+        const baseId = event.id;
+        const key = event.isRecurring ? `${baseId}|${event.rawDate}` : baseId;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
 
-      // Extra pass to catch duplicate rows with different ids but same content
-      const seenContent = new Set<string>();
-      const uniqueEvents = uniqueById.filter((event) => {
-        // For recurring events, we MUST include the date to distinguish occurrences
-        const baseId = event.id || [
-          event.title || "",
-          event.time || "",
-          (event.location || "").toLowerCase(),
-        ].join("|");
-        const contentKey = event.isRecurring ? `${baseId}|${event.rawDate}` : baseId;
-
-        if (seenContent.has(contentKey)) return false;
-        seenContent.add(contentKey);
-        return true;
-      });
-
       setEvents(uniqueEvents);
     } catch (err) {
-      console.error("Error fetching events:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch events");
       setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [supabase, personalized, userId, searchQuery, language, userLocation, maxPrice, eventType, gender]);
+  }, [supabase, personalized, userId, searchQuery, language, userLocation, maxPrice, eventType, gender, selectedCurrency, exchangeRates, refreshRates, currencyInfo]);
 
   useEffect(() => {
     fetchEvents();
@@ -479,200 +401,89 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
   return { events, loading, error, refetch: fetchEvents };
 }
 
-interface UseEventResult {
-  event: EventCardData | null;
-  loading: boolean;
-  error: string | null;
-}
-
-export function useEvent(id: string): UseEventResult {
+export function useEvent(id: string): { event: EventCardData | null; loading: boolean; error: string | null } {
   const supabase = useSupabaseClient();
   const { language } = useLanguage();
   const { user } = useUser();
   const [event, setEvent] = useState<EventCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { selectedCurrency, exchangeRates, refreshRates, currencyInfo } = useCurrency();
 
   useEffect(() => {
     async function fetchEvent() {
       try {
-        console.log("🔍 Fetching event with ID:", id);
         setLoading(true);
         setError(null);
+        const { data, error: fetchError } = await supabase.from("events").select(`
+                    *,
+                    organizer:users!events_organizer_id_fkey (name, image_url),
+                    attendees (user_id, user:users (image_url)),
+                    event_tags (tags (name, tag_translations (language_code, name)))
+                `).eq("id", id).maybeSingle();
 
-        const { data, error: fetchError } = await supabase
-          .from("events")
-          .select(
-            `
-                        *,
-                        organizer:users!events_organizer_id_fkey (
-                            name,
-                            image_url
-                        ),
-                        attendees (
-                            user_id,
-                            user:users (
-                              image_url
-                            )
-                        ),
-                        event_tags (
-                            tags (
-                                name,
-                                tag_translations (
-                                    language_code,
-                                    name
-                                )
-                            )
-                        )
-                    `,
-          )
-          .eq("id", id)
-          .single();
+        if (fetchError || !data) throw fetchError || new Error("Event not found");
 
-        if (fetchError) {
-          console.error("❌ Supabase fetch error:", fetchError);
-          throw fetchError;
+        if (data.currency_code && data.currency_code !== selectedCurrency && !exchangeRates[data.currency_code]) {
+          await refreshRates([data.currency_code]);
         }
 
-        // Log the raw data from Supabase to debug
-        console.log("✅ Raw event data from Supabase:", JSON.stringify(data, null, 2));
+        const currencyContext = {
+          userCurrencyCode: selectedCurrency,
+          userCurrency: currencyInfo,
+          currencyByCode: { [selectedCurrency]: currencyInfo! },
+          rateToUserByCode: { [selectedCurrency]: 1, ...exchangeRates },
+        };
 
-        // Handle case where data might be an array (even though we used .single())
-        let eventData = data;
-        if (Array.isArray(data) && data.length > 0) {
-          console.log("⚠️ Data is an array, extracting first element");
-          eventData = data[0];
-        }
-
-        let userCurrencyCode: string | null = null;
-        if (user?.id) {
-          const { data: userRow } = await supabase
-            .from("users")
-            .select("currency_code,currency_auto_detected,country_code")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (userRow?.currency_code) {
-            userCurrencyCode = userRow.currency_code;
-          }
-
-          if (!userCurrencyCode || userRow?.currency_auto_detected) {
-            const ipCountry = await detectAndStoreIpCountry();
-            const detectionCountry = ipCountry || userRow?.country_code || getCountryCodeFromLocale();
-            const detected = await autoDetectAndUpdateUserCurrency(
-              supabase,
-              user.id,
-              detectionCountry,
-            );
-            if (detected) {
-              userCurrencyCode = detected;
-            }
-          }
-        }
-
-        const currencyContext = await buildCurrencyContext(
-          supabase,
-          userCurrencyCode,
-          [eventData?.currency_code],
-        );
-
-        // Map Supabase data (Pass userId if available for attendance check)
-        const mappedEvent = transformEventToCardData(
-          eventData,
-          user?.id || null,
-          language,
-          currencyContext,
-        );
-
-        console.log("✅ Mapped event data:", mappedEvent);
-        setEvent(mappedEvent);
+        setEvent(transformEventToCardData(data, user?.id || null, language, currencyContext));
       } catch (err) {
-        console.error("❌ Error fetching event:", err);
-        console.error("❌ Error details:", JSON.stringify(err, null, 2));
         setError(err instanceof Error ? err.message : "Failed to fetch event");
-        const dummyEvent = EVENTS.find((e) => e.id === id);
-        console.log("⚠️ Falling back to dummy event:", dummyEvent);
-        setEvent(dummyEvent ? (dummyEvent as any) : null);
       } finally {
         setLoading(false);
       }
     }
-
-    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-
-    if (id && id !== "undefined" && isUUID(id)) {
-      fetchEvent();
-    } else {
-      setLoading(false);
-    }
-  }, [id, supabase, language, user?.id]);
+    if (id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) fetchEvent();
+    else setLoading(false);
+  }, [id, supabase, language, user?.id, selectedCurrency, exchangeRates, refreshRates, currencyInfo]);
 
   return { event, loading, error };
 }
 
-interface UseTagsResult {
-  tags: string[];
-  loading: boolean;
-  error: string | null;
-  tagObjects: Array<{ id: number; name: string; label: string }>;
-  refetch: () => Promise<void>;
-}
-
-export function useTags(): UseTagsResult {
+export function useTags(): { tags: string[]; tagObjects: any[]; loading: boolean; error: string | null; refetch: () => Promise<void> } {
   const supabase = useSupabaseClient();
   const { language, t } = useLanguage();
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagObjects, setTagObjects] = useState<Array<{ id: number; name: string; label: string }>>([]);
+  const [tagObjects, setTagObjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTags = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
-        .from("tags")
-        .select("id, name, tag_translations(language_code, name)");
-
+      const { data, error: fetchError } = await supabase.from("tags").select("id, name, tag_translations(language_code, name)");
       if (fetchError) throw fetchError;
-
-      const allLabel = t("create_event_gender_all") || "All";
-      const nearMeLabel = t("location_near_me") || "Near me";
 
       const objects = data.map((tag: any) => {
         let label = tag.name;
-        if (language !== "en") {
-          let tr = tag.tag_translations?.find((tr: any) => tr.language_code === language);
-          if (!tr && language === "ar-EG") {
-            tr = tag.tag_translations?.find((tr: any) => tr.language_code === "ar");
-          }
-          if (tr) label = tr.name;
-        }
-
-        return {
-          id: tag.id,
-          name: tag.name,
-          label: label
-        };
+        const tr = tag.tag_translations?.find((t: any) => t.language_code === (language === "ar-EG" ? "ar" : language));
+        if (tr) label = tr.name;
+        return { id: tag.id, name: tag.name, label };
       });
 
       setTagObjects(objects);
-      setTags([allLabel, nearMeLabel, ...objects.map((o: any) => o.label)]);
     } catch (err) {
-      console.error("Error fetching tags:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch tags");
-      // Fallback
-      setTags(TAGS);
-      setTagObjects(TAGS.map((t, i) => ({ id: i, name: t, label: t })));
     } finally {
       setLoading(false);
     }
-  }, [supabase, language, t]);
+  }, [supabase, language]);
 
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+  useEffect(() => { fetchTags(); }, [fetchTags]);
 
-  return { tags, tagObjects, loading, error, refetch: fetchTags };
+  return {
+    tags: [t("create_event_gender_all") || "All", t("location_near_me") || "Near me", ...tagObjects.map(o => o.label)],
+    tagObjects,
+    loading,
+    error,
+    refetch: fetchTags
+  };
 }
