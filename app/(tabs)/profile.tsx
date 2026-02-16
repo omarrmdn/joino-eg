@@ -20,6 +20,7 @@ import Animated, {
     FadeInRight,
     Layout,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../src/constants/Colors";
 import { PROMOTIONS_ENABLED } from "../../src/constants/FeatureFlags";
 import { Fonts } from "../../src/constants/Fonts";
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { showAlert, showToast } = useAlert();
+  const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -285,7 +287,7 @@ export default function ProfileScreen() {
 
   if (analyticsLoading || tagsLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -293,7 +295,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView 
-      style={styles.container} 
+      style={[styles.container, { paddingTop: insets.top }]} 
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl

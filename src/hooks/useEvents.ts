@@ -546,7 +546,7 @@ export function useEvent(id: string): UseEventResult {
         if (user?.id) {
           const { data: userRow } = await supabase
             .from("users")
-            .select("currency_code,currency_auto_detected")
+            .select("currency_code,currency_auto_detected,country_code")
             .eq("id", user.id)
             .maybeSingle();
 
@@ -555,10 +555,11 @@ export function useEvent(id: string): UseEventResult {
           }
 
           if (!userCurrencyCode || userRow?.currency_auto_detected) {
+            const detectionCountry = userRow?.country_code || getCountryCodeFromLocale();
             const detected = await autoDetectAndUpdateUserCurrency(
               supabase,
               user.id,
-              getCountryCodeFromLocale(),
+              detectionCountry,
             );
             if (detected) {
               userCurrencyCode = detected;

@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchIconLtr: {
-    marginStart: 4,
+    marginStart: 12,
     marginEnd: 8,
   },
   searchIconRtl: {
-    marginStart: 4,
+    marginStart: 12,
     marginEnd: 8,
   },
   input: {

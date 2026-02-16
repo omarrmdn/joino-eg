@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Localization from "expo-localization";
 
@@ -415,6 +416,28 @@ export async function detectCurrencyCodeByCountry(
   }
 }
 
+
+export async function detectAndStoreIpCountry(): Promise<string | null> {
+  try {
+    const stored = await AsyncStorage.getItem('device_country_code');
+    if (stored) return stored;
+
+    console.log("[Currency] Fetching IP country from ipapi.co...");
+    const response = await fetch("https://ipapi.co/json/");
+    const data = await response.json();
+    const country = data.country_code;
+
+    if (country) {
+      await AsyncStorage.setItem('device_country_code', country);
+      console.log(`[Currency] IP Country detected and stored: ${country}`);
+      return country;
+    }
+  } catch (e) {
+    console.warn("[Currency] IP fetch failed", e);
+  }
+  return null;
+}
+
 /**
  * Auto-detect and update user currency based on IP country ONLY.
  * The detected IP country is saved in the DB. Currency is only
@@ -428,6 +451,11 @@ export async function autoDetectAndUpdateUserCurrency(
   ipCountryCode?: string | null,
 ): Promise<string | null> {
   if (!userId) return null;
+
+  // If no IP country provided, try to detect it
+  if (!ipCountryCode) {
+    ipCountryCode = await detectAndStoreIpCountry();
+  }
 
   try {
     const { data: userRow, error } = await supabase

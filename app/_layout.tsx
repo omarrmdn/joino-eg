@@ -176,6 +176,13 @@ const RootContent = ({ appIsReady, showOnboarding, setShowOnboarding }: RootCont
        supabase.from('users').update({ language }).eq('id', userId).then(({ error }) => {
          if (error) console.warn('[RootContent] Language sync error:', error);
        });
+
+       // Auto-detect currency via IP
+       import('../src/utils/currency').then(({ autoDetectAndUpdateUserCurrency }) => {
+          autoDetectAndUpdateUserCurrency(supabase, userId).catch(err => {
+             console.warn('[RootContent] Currency detect error:', err);
+          });
+       });
     }
   }, [isSignedIn, userId, language]);
   const prevSignedInRef = useRef<boolean | null>(null);

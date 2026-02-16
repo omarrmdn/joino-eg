@@ -22,7 +22,8 @@ import { useLanguage } from "../src/lib/i18n";
 // Format time as relative string (e.g., "2 hours ago", "1 day ago")
 const formatTimeAgo = (dateString: string): string => {
   const now = new Date();
-  const date = new Date(dateString);
+  // If no timezone indicator, assume UTC
+  const date = new Date((!dateString.includes('Z') && !dateString.includes('+')) ? dateString + 'Z' : dateString);
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
