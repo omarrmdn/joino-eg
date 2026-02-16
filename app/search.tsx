@@ -103,7 +103,7 @@ export default function SearchScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{t('tab_search') || 'Search'}</Text>
+          <Text style={styles.headerTitle}>Search</Text>
         </View>
 
         <View style={styles.searchBarContainer}>
@@ -119,7 +119,7 @@ export default function SearchScreen() {
                 styles.input, 
                 isRtl && { textAlign: 'right', writingDirection: 'rtl' }
               ]}
-              placeholder={t("search_input_placeholder")}
+              placeholder="search"
               placeholderTextColor={Colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -146,7 +146,7 @@ export default function SearchScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('filters') || 'Filters'}</Text>
+              <Text style={styles.modalTitle}>Filters</Text>
               <TouchableOpacity onPress={() => setIsFilterVisible(false)}>
                 <Ionicons name="close" size={24} color={Colors.white} />
               </TouchableOpacity>
@@ -155,7 +155,7 @@ export default function SearchScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Max Price */}
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>{t('max_price') || 'Max Price'}</Text>
+                <Text style={styles.filterLabel}>Max Price</Text>
                 <TextInput
                   style={styles.priceInput}
                   placeholder="E£ 0.00"
@@ -168,7 +168,7 @@ export default function SearchScreen() {
 
               {/* Event Type */}
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>{t('event_type') || 'Event Type'}</Text>
+                <Text style={styles.filterLabel}>Event Type</Text>
                 <View style={styles.segmentedControl}>
                   {(['all', 'online', 'onsite'] as const).map((type) => (
                     <TouchableOpacity
@@ -177,7 +177,7 @@ export default function SearchScreen() {
                       onPress={() => setEventType(type)}
                     >
                       <Text style={[styles.segmentText, eventType === type && styles.segmentTextActive]}>
-                        {type === 'all' ? (t('all') || 'All') : type === 'online' ? (t('online') || 'Online') : (t('onsite') || 'Onsite')}
+                        {type === 'all' ? 'All' : type === 'online' ? 'Online' : 'Onsite'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -186,7 +186,7 @@ export default function SearchScreen() {
 
               {/* Gender */}
               <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>{t('gender') || 'Gender'}</Text>
+                <Text style={styles.filterLabel}>Gender</Text>
                 <View style={styles.segmentedControl}>
                   {(['all', 'male', 'female'] as const).map((g) => (
                     <TouchableOpacity
@@ -195,7 +195,7 @@ export default function SearchScreen() {
                       onPress={() => setGenderFilter(g)}
                     >
                       <Text style={[styles.segmentText, genderFilter === g && styles.segmentTextActive]}>
-                        {g === 'all' ? (t('all') || 'All') : g === 'male' ? (t('male') || 'Male') : (t('female') || 'Female')}
+                        {g === 'all' ? 'All' : g === 'male' ? 'Male' : 'Female'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -204,7 +204,7 @@ export default function SearchScreen() {
 
               {/* Near Me Toggle */}
               <View style={[styles.filterSection, styles.rowBetween]}>
-                <Text style={styles.filterLabel}>{t('near_me') || 'Near me'}</Text>
+                <Text style={styles.filterLabel}>Near me</Text>
                 <Switch
                   value={nearMe}
                   onValueChange={setNearMe}
@@ -216,10 +216,10 @@ export default function SearchScreen() {
 
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
-                <Text style={styles.resetButtonText}>{t('reset') || 'Reset'}</Text>
+                <Text style={styles.resetButtonText}>Reset</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.applyButton} onPress={() => setIsFilterVisible(false)}>
-                <Text style={styles.applyButtonText}>{t('apply') || 'Apply'}</Text>
+                <Text style={styles.applyButtonText}>Apply</Text>
               </TouchableOpacity>
             </View>
           </View>

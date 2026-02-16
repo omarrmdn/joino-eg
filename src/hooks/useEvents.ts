@@ -480,7 +480,7 @@ export function useTags(): { tags: string[]; tagObjects: any[]; loading: boolean
   useEffect(() => { fetchTags(); }, [fetchTags]);
 
   return {
-    tags: [t("create_event_gender_all") || "All", t("location_near_me") || "Near me", ...tagObjects.map(o => o.label)],
+    tags: ["All", "Near me", ...tagObjects.map(o => o.label)],
     tagObjects,
     loading,
     error,

@@ -1,8 +1,8 @@
 import { useUser } from "@clerk/clerk-expo";
-import { useEffect, useMemo, useState } from "react";
-import { useTags } from "./useEvents";
+import { useEffect, useState } from "react";
 import { useLanguage } from "../lib/i18n";
 import { useSupabaseClient } from "../lib/supabaseConfig";
+import { useTags } from "./useEvents";
 
 const shuffle = (items: string[]) => {
   const arr = [...items];
@@ -50,7 +50,7 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
   const { tags, tagObjects } = useTags();
   const [userInterests, setUserInterests] = useState<string[]>([]);
   const [pool, setPool] = useState<string[]>([]);
-  const [placeholder, setPlaceholder] = useState(t("search_placeholder"));
+  const [placeholder, setPlaceholder] = useState("Search for events, people or tags");
 
   useEffect(() => {
     let isMounted = true;
@@ -91,13 +91,14 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
 
     const mixed = buildMixedList(interestedLabels, otherTags, maxItems);
     const withFallback = mixed.length > 0 ? mixed : baseTags.slice(0, maxItems);
-    const unique = Array.from(new Set([t("search_placeholder"), ...withFallback]));
+    // Use English fallback for the search placeholder item in the pool
+    const unique = Array.from(new Set(["Search for events, people or tags", ...withFallback]));
     setPool(unique);
-  }, [tags, tagObjects, userInterests, maxItems, t, refreshToken]);
+  }, [tags, tagObjects, userInterests, maxItems, refreshToken]);
 
   useEffect(() => {
     if (!active || pool.length === 0) {
-      setPlaceholder(t("search_placeholder"));
+      setPlaceholder("Search for events, people or tags");
       return;
     }
 
@@ -109,7 +110,7 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
 
     const tick = () => {
       if (!isMounted) return;
-      const word = pool[wordIndex % pool.length] || t("search_placeholder");
+      const word = pool[wordIndex % pool.length] || "Search for events, people or tags";
 
       if (isDeleting) {
         charIndex -= 1;

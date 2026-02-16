@@ -2,13 +2,13 @@ import { useUser } from "@clerk/clerk-expo";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  RefreshControl,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Animated,
+    RefreshControl,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "../../src/components/EventCard";
@@ -36,8 +36,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const { userData } = useUserAnalytics();
-  const allTagLabel = useMemo(() => t("create_event_gender_all") || "All", [t]);
-  const nearMeLabel = useMemo(() => t("location_near_me") || "Near me", [t]);
+  const allTagLabel = useMemo(() => "All", []);
+  const nearMeLabel = useMemo(() => "Near me", []);
   const [activeTag, setActiveTag] = useState(allTagLabel);
   const [userCity, setUserCity] = useState<string | null>(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
