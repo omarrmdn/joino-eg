@@ -8,6 +8,7 @@ import {
   autoDetectAndUpdateUserCurrency,
   buildCurrencyContext,
   DEFAULT_CURRENCY_CODE,
+  detectAndStoreIpCountry,
   getCountryCodeFromLocale,
 } from "../utils/currency";
 import { getGeoInfoByIP } from "../utils/ip";
@@ -207,7 +208,8 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
         // If currency is missing OR it's set to auto-detect, verify/update it
         if (!userCurrencyCode || data?.currency_auto_detected) {
           // Use stored country_code if available, otherwise fallback to locale
-          const detectionCountry = data?.country_code || getCountryCodeFromLocale();
+          const ipCountry = await detectAndStoreIpCountry();
+          const detectionCountry = ipCountry || data?.country_code || getCountryCodeFromLocale();
           console.log(`💰 Detecting currency for country: ${detectionCountry}`);
 
           const detected = await autoDetectAndUpdateUserCurrency(
@@ -555,7 +557,8 @@ export function useEvent(id: string): UseEventResult {
           }
 
           if (!userCurrencyCode || userRow?.currency_auto_detected) {
-            const detectionCountry = userRow?.country_code || getCountryCodeFromLocale();
+            const ipCountry = await detectAndStoreIpCountry();
+            const detectionCountry = ipCountry || userRow?.country_code || getCountryCodeFromLocale();
             const detected = await autoDetectAndUpdateUserCurrency(
               supabase,
               user.id,
