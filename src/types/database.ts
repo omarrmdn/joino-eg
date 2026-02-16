@@ -93,7 +93,8 @@ export interface EventCardData {
   time: string;
   gender: string;
   image: string;
-  price: string;
+  price: string; // Formatted price string
+  rawPrice: number; // Raw numeric price for dynamic conversion
   currencyCode?: string | null;
   attendingAvatars: string[];
   attendingCount: number;
@@ -214,6 +215,7 @@ export function transformEventToCardData(
     gender: event.gender || "all",
     image: event.image_url || "",
     price: priceStr,
+    rawPrice: event.price || 0,
     currencyCode: (event as any).currency_code || null,
     attendingAvatars: avatarColors,
     attendingCount: event.attendees?.length || 0,

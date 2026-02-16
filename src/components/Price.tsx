@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, TextStyle } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { Fonts } from '../constants/Fonts';
 import { useCurrency } from '../lib/CurrencyContext';
 import { useLanguage } from '../lib/i18n';
 import { formatCurrencyAmount, normalizeCurrencyCode } from '../utils/currency';
@@ -88,13 +90,13 @@ export const Price: React.FC<PriceProps> = ({ amount, currencyCode, style }) => 
 
 const styles = StyleSheet.create({
   price: {
-    fontFamily: 'GraphikArabic-Medium',
+    fontFamily: Fonts.medium,
     fontSize: 16,
-    color: '#000',
+    color: Colors.white,
   },
   free: {
-    fontFamily: 'GraphikArabic-Semibold',
+    fontFamily: Fonts.semibold,
     fontSize: 16,
-    color: '#10B981', // Emerald green
-  }
+    color: "#10B981", // Emerald green
+  },
 });

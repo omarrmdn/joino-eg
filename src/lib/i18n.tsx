@@ -274,7 +274,9 @@ export type TranslationKey =
   | "recurrence_biweekly"
   | "recurrence_monthly"
   | "recurrence_every"
-  | "event_cancellation_reason_organizer_deleted";
+  | "event_cancellation_reason_organizer_deleted"
+  | "settings_currency"
+  | "settings_currency_description";
 
 type Translations = Record<Language, Record<TranslationKey, string>>;
 
@@ -539,6 +541,8 @@ export const translations: Translations = {
     recurrence_monthly: "Monthly",
     recurrence_every: "Every",
     event_cancellation_reason_organizer_deleted: "Event deleted by organizer",
+    settings_currency: "Currency",
+    settings_currency_description: "Choose your preferred currency for event prices.",
   },
   ar: {
     tab_home: "الرئيسية",
@@ -800,6 +804,8 @@ export const translations: Translations = {
     recurrence_monthly: "شهريًا",
     recurrence_every: "كل",
     event_cancellation_reason_organizer_deleted: "تم حذف الفعالية بواسطة المنظم",
+    settings_currency: "العملة",
+    settings_currency_description: "اختر العملة المفضلة لديك لعرض أسعار الفعاليات.",
   },
   "ar-EG": {
     tab_home: "الرئيسية",
@@ -1061,6 +1067,8 @@ export const translations: Translations = {
     recurrence_monthly: "شهريًا",
     recurrence_every: "كل",
     event_cancellation_reason_organizer_deleted: "الإيفنت اتمسح من المنظم",
+    settings_currency: "العملة",
+    settings_currency_description: "اختار العملة اللي تحب تشوف بيها أسعار الإيفنتات.",
   },
 };
 

@@ -18,6 +18,7 @@ import { EventCardData } from "../types/database";
 import { formatEventDateLabel, formatEventTime } from "../utils/date";
 import { getRecurringLabel } from "../utils/recurrence";
 import { shareEvent } from "../utils/shareEvent";
+import { Price } from "./Price";
 
 interface EventCardProps {
   event: EventCardData;
@@ -141,7 +142,11 @@ export const EventCard = React.memo(({ event, index = 0 }: EventCardProps) => {
             </View>
 
             <View style={styles.footerRow}>
-              <Text style={styles.price}>{event.price}</Text>
+              <Price 
+                amount={event.rawPrice} 
+                currencyCode={event.currencyCode} 
+                style={styles.price} 
+              />
 
               <View style={styles.avatarPile}>
                 {event.attendingCount > 0 && (

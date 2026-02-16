@@ -4,11 +4,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -137,9 +137,9 @@ export default function SettingsScreen() {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>{t("settings_currency") || "Currency"}</Text>
+        <Text style={styles.sectionTitle}>{t("settings_currency")}</Text>
         <Text style={styles.sectionDescription}>
-          {t("settings_currency_description") || "Change the displayed currency for event prices."}
+          {t("settings_currency_description")}
         </Text>
 
         <View style={styles.currencyOptions}>

@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { EventQuestion } from "../notification/notifications";
 import { Button } from "../src/components/Button";
+import { Price } from "../src/components/Price";
 import { RatingBottomSheet } from "../src/components/RatingBottomSheet";
 import { TagPill } from "../src/components/TagPill";
 import { Colors } from "../src/constants/Colors";
@@ -793,7 +794,11 @@ export default function EventDetailsScreen() {
 
           <View style={[styles.detailRow, { marginTop: 15 }]}>
             <View style={styles.priceGenderRow}>
-              <Text style={styles.priceBold}>{eventData.price}</Text>
+              <Price 
+                amount={eventData.rawPrice} 
+                currencyCode={eventData.currencyCode} 
+                style={styles.priceBold} 
+              />
               <View style={styles.genderContainer}>
                 {eventData.gender.toLowerCase() === "male" && (
                   <Ionicons name="male" size={18} color={Colors.primary} />
