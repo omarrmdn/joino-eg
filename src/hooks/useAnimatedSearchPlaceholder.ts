@@ -50,7 +50,7 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
   const { tags, tagObjects } = useTags();
   const [userInterests, setUserInterests] = useState<string[]>([]);
   const [pool, setPool] = useState<string[]>([]);
-  const [placeholder, setPlaceholder] = useState("Search for events, people or tags");
+  const [placeholder, setPlaceholder] = useState(t("search_placeholder"));
 
   useEffect(() => {
     let isMounted = true;
@@ -91,14 +91,13 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
 
     const mixed = buildMixedList(interestedLabels, otherTags, maxItems);
     const withFallback = mixed.length > 0 ? mixed : baseTags.slice(0, maxItems);
-    // Use English fallback for the search placeholder item in the pool
-    const unique = Array.from(new Set(["Search for events, people or tags", ...withFallback]));
+    const unique = Array.from(new Set([t("search_placeholder"), ...withFallback]));
     setPool(unique);
-  }, [tags, tagObjects, userInterests, maxItems, refreshToken]);
+  }, [tags, tagObjects, userInterests, maxItems, t, refreshToken]);
 
   useEffect(() => {
     if (!active || pool.length === 0) {
-      setPlaceholder("Search for events, people or tags");
+      setPlaceholder(t("search_placeholder"));
       return;
     }
 
@@ -110,7 +109,7 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
 
     const tick = () => {
       if (!isMounted) return;
-      const word = pool[wordIndex % pool.length] || "Search for events, people or tags";
+      const word = pool[wordIndex % pool.length] || t("search_placeholder");
 
       if (isDeleting) {
         charIndex -= 1;

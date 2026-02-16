@@ -36,15 +36,15 @@ export const TopBar = React.memo(({ searchQuery, onSearchChange: _onSearchChange
 
   const barStyle = [
     styles.searchBarInner, 
-    { flexDirection: isRtl ? "row-reverse" : "row" } as any
+    { flexDirection: "row" } as any
   ];
 
   const textStyle = [
     styles.input,
     isEmptyQuery && styles.placeholderText,
     { 
-      textAlign: isRtl ? "right" : "left",
-      writingDirection: isRtl ? "rtl" : "ltr" 
+      textAlign: "left",
+      writingDirection: "ltr" 
     } as any
   ];
 
@@ -69,7 +69,7 @@ export const TopBar = React.memo(({ searchQuery, onSearchChange: _onSearchChange
             name="search" 
             size={20} 
             color={Colors.textSecondary} 
-            style={isRtl ? styles.searchIconRtl : styles.searchIconLtr} 
+            style={styles.searchIconLtr} 
           />
           <Text numberOfLines={1} style={textStyle}>
             {displayValue}
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
-    marginStart: 7.5,
+    marginLeft: 7.5,
   },
   notificationBubble: {
     position: 'absolute',

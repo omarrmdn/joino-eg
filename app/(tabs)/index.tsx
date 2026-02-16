@@ -36,8 +36,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const { userData } = useUserAnalytics();
-  const allTagLabel = useMemo(() => "All", []);
-  const nearMeLabel = useMemo(() => "Near me", []);
+  const allTagLabel = useMemo(() => t("create_event_gender_all") || "All", [t]);
+  const nearMeLabel = useMemo(() => t("location_near_me") || "Near me", [t]);
   const [activeTag, setActiveTag] = useState(allTagLabel);
   const [userCity, setUserCity] = useState<string | null>(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
