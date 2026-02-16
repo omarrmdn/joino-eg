@@ -397,7 +397,10 @@ export async function detectCurrencyCodeByCountry(
   countryCode?: string | null,
 ): Promise<string | null> {
   const normalized = normalizeCountryCode(countryCode);
-  if (!normalized) return null;
+  if (!normalized) return DEFAULT_CURRENCY_CODE;
+
+  // Hardcoded priority cases
+  if (normalized === 'EG') return 'EGP';
 
   try {
     const { data, error } = await supabase
@@ -406,13 +409,20 @@ export async function detectCurrencyCodeByCountry(
       .contains("country_codes", [normalized])
       .eq("is_active", true);
 
-    if (error || !data || data.length === 0) return null;
+    if (error || !data || data.length === 0) {
+      console.log(`[Currency] No mapping found for ${normalized}, falling back to ${DEFAULT_CURRENCY_CODE}`);
+      return DEFAULT_CURRENCY_CODE;
+    }
 
+    // Prioritize EGP if it's in the results for some reason, otherwise take the first one
     const preferred =
       data.find((row) => row.code === DEFAULT_CURRENCY_CODE) || data[0];
-    return preferred?.code ? String(preferred.code) : null;
-  } catch {
-    return null;
+
+    console.log(`[Currency] Detected ${preferred.code} for country ${normalized}`);
+    return preferred?.code ? String(preferred.code) : DEFAULT_CURRENCY_CODE;
+  } catch (e) {
+    console.warn("[Currency] detectCurrencyCodeByCountry failed", e);
+    return DEFAULT_CURRENCY_CODE;
   }
 }
 
@@ -450,7 +460,7 @@ export async function autoDetectAndUpdateUserCurrency(
   userId: string,
   ipCountryCode?: string | null,
 ): Promise<string | null> {
-  if (!userId) return null;
+  if (!userId) return DEFAULT_CURRENCY_CODE;
 
   // If no IP country provided, try to detect it
   if (!ipCountryCode) {
@@ -464,7 +474,7 @@ export async function autoDetectAndUpdateUserCurrency(
       .eq("id", userId)
       .maybeSingle();
 
-    if (error || !userRow) return null;
+    if (error || !userRow) return DEFAULT_CURRENCY_CODE;
 
     // If user manually set their currency (not auto-detected), respect it.
     if (userRow.currency_auto_detected === false && userRow.currency_code) {
@@ -474,9 +484,9 @@ export async function autoDetectAndUpdateUserCurrency(
     const savedCountry = normalizeCountryCode(userRow.country_code);
     const newCountry = normalizeCountryCode(ipCountryCode);
 
-    // If we already have a currency AND the IP country hasn't changed, skip detection.
+    // If we already have a currency AND it's NOT USD (unless we are sure we want USD), keep it.
+    // This prevents "crashly switching to USD" if we already had a decent default.
     if (userRow.currency_code && savedCountry && savedCountry === newCountry) {
-      console.log(`[currency] Country unchanged (${savedCountry}), skipping re-detection.`);
       return normalizeCurrencyCode(userRow.currency_code);
     }
 
@@ -486,6 +496,14 @@ export async function autoDetectAndUpdateUserCurrency(
     if (newCountry) {
       console.log(`[currency] IP country detected: ${newCountry} (saved: ${savedCountry}). Detecting currency...`);
       const detected = await detectCurrencyCodeByCountry(supabase, newCountry);
+
+      // SAFETY: If detected is USD but we are currently EGP and detection isn't from 'US'
+      // let's be suspicious and stick to EGP unless it's a very clear case.
+      if (detected === 'USD' && userRow.currency_code === 'EGP' && newCountry !== 'US') {
+        console.log(`[Currency] Avoiding switch from EGP to USD for country ${newCountry}`);
+        return 'EGP';
+      }
+
       if (detected) {
         const updates: Record<string, any> = {
           currency_code: detected,
@@ -505,28 +523,34 @@ export async function autoDetectAndUpdateUserCurrency(
       const { data: funcData, error: funcError } = await supabase.functions.invoke('detect-currency');
 
       if (!funcError && funcData?.currency && funcData?.country) {
+        const detected = funcData.currency;
         const edgeCountry = normalizeCountryCode(funcData.country);
         console.log(`[currency] Edge Function detected: ${funcData.currency} (${edgeCountry})`);
 
+        // Similar safety check for Edge function
+        if (detected === 'USD' && userRow.currency_code === 'EGP' && edgeCountry !== 'US') {
+          console.log(`[Currency] Avoiding switch from EGP to USD from Edge Function for country ${edgeCountry}`);
+          return 'EGP';
+        }
+
         // Save the Edge Function result
         const updates: Record<string, any> = {
-          currency_code: funcData.currency,
+          currency_code: detected,
           currency_auto_detected: true,
           currency_updated_at: new Date().toISOString(),
         };
         if (edgeCountry) updates.country_code = edgeCountry;
         await supabase.from("users").update(updates).eq("id", userId);
-
-        return funcData.currency;
+        return detected;
       }
     } catch (edgeErr) {
       console.warn("[currency] Edge Function invocation exception:", edgeErr);
     }
 
     // 3. If no IP info at all, keep whatever the user already has
-    return normalizeCurrencyCode(userRow.currency_code) || null;
+    return normalizeCurrencyCode(userRow.currency_code) || DEFAULT_CURRENCY_CODE;
   } catch {
-    return null;
+    return DEFAULT_CURRENCY_CODE;
   }
 }
 
