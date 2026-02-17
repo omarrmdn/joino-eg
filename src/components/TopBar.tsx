@@ -109,6 +109,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderWidth: 1,
     borderColor: Colors.gray,
+    direction: 'ltr', // Force LTR
   },
   searchBarInner: {
     flex: 1,
@@ -116,12 +117,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchIconLtr: {
-    marginStart: 12,
-    marginEnd: 8,
+    marginLeft: 12, // Fixed left margin
+    marginRight: 8,  // Fixed right margin
   },
   searchIconRtl: {
-    marginStart: 12,
-    marginEnd: 8,
+    marginLeft: 12, // Fixed left margin
+    marginRight: 8,  // Fixed right margin
   },
   input: {
     flex: 1,
@@ -139,7 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 7.5,
+    marginLeft: 7.5, // Fixed left margin
   },
   notificationBubble: {
     position: 'absolute',

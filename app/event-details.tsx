@@ -716,9 +716,9 @@ export default function EventDetailsScreen() {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : (Platform.OS === "android" ? "height" : undefined)}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 20}
       >
         <ScrollView
           ref={scrollRef}
@@ -943,6 +943,19 @@ export default function EventDetailsScreen() {
         )}
 
         {/* Edit / Join / Cancel Button */}
+        {/* Automatical location/link delivery tips */}
+        {!isOrganizer && !isAttending && eventData.status !== "canceled" && !isEnded && (
+          <View style={styles.joinTipContainer}>
+            <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
+            <Text style={styles.joinTipText}>
+              {eventData.isOnline 
+                ? (t("event_online_link_auto_tip" as any) || "Tip: Event link will be sent automatically to attendees.")
+                : (t("event_onsite_location_auto_tip" as any) || "Tip: Event location will be sent automatically to attendees.")
+              }
+            </Text>
+          </View>
+        )}
+
         {isOrganizer ? (
           <View style={styles.organizerActions}>
             <Button
@@ -1379,6 +1392,21 @@ const styles = StyleSheet.create({
   },
   joinButtonMargin: {
     marginTop: 6,
+  },
+  joinTipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+    marginBottom: 5,
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  joinTipText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: Fonts.medium,
+    textAlign: 'center',
   },
   questionsList: {
     marginTop: 8,

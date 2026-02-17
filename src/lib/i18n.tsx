@@ -101,6 +101,10 @@ export type TranslationKey =
   | "profile_edit"
   | "profile_done"
   | "profile_no_interests"
+  | "profile_search_interests_placeholder"
+  | "create_event_description_tip"
+  | "event_online_link_auto_tip"
+  | "event_onsite_location_auto_tip"
   | "error_generic"
   | "error_required_fields"
   | "error_location_required_onsite"
@@ -384,6 +388,10 @@ export const translations: Translations = {
     profile_edit: "Edit",
     profile_done: "Done",
     profile_no_interests: "No interests added yet. Tap Edit to add some!",
+    profile_search_interests_placeholder: "Search interests...",
+    create_event_description_tip: "Tip: You can write more details about the event or a detailed location here.",
+    event_online_link_auto_tip: "Tip: Event link will be sent automatically to attendees.",
+    event_onsite_location_auto_tip: "Tip: Event location will be sent automatically to attendees.",
     error_generic: "An error occurred. Please try again.",
     error_required_fields: "Please fill in all required fields (*) including Date and Time.",
     error_location_required_onsite: "Please enter a location for onsite events.",
@@ -647,6 +655,10 @@ export const translations: Translations = {
     profile_edit: "تعديل",
     profile_done: "تم",
     profile_no_interests: "لم تضف أي اهتمامات بعد. اضغط على تعديل لإضافة بعض منها!",
+    profile_search_interests_placeholder: "ابحث في الاهتمامات...",
+    create_event_description_tip: "تلميح: يمكنك كتابة تفاصيل أكثر عن الفعالية أو تفصيل للموقع هنا.",
+    event_online_link_auto_tip: "تلميح: سيتم إرسال رابط الفعالية تلقائيًا للمشاركين.",
+    event_onsite_location_auto_tip: "تلميح: سيتم إرسال موقع الفعالية تلقائيًا للمشاركين.",
     error_generic: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     error_required_fields: "يرجى تعبئة جميع الحقول المطلوبة (*) بما في ذلك التاريخ والوقت.",
     error_location_required_onsite: "يرجى إدخال موقع للفعاليات الحضورية.",
@@ -910,6 +922,10 @@ export const translations: Translations = {
     profile_edit: "تعديل",
     profile_done: "تم",
     profile_no_interests: "لسه ما ضفتش أي اهتمامات. دوس تعديل عشان تضيف!",
+    profile_search_interests_placeholder: "دور في اهتماماتك...",
+    create_event_description_tip: "تلميح: تقدر تكتب تفاصيل أكتر عن الإيفنت أو تفصيل للمكان هنا.",
+    event_online_link_auto_tip: "تلميح: رابط الإيفنت هيتبعت تلقائي لكل اللي سجلوا.",
+    event_onsite_location_auto_tip: "تلميح: مكان الإيفنت هيتبعت تلقائي لكل اللي سجلوا.",
     error_generic: "حصل مشكلة. حاول تاني كده.",
     error_required_fields: "يا ريت تملى كل الخانات المطلوبة (*) ",
     error_location_required_onsite: "يا ريت تكتب المكان فين بالظبط.",

@@ -1,5 +1,5 @@
 import { useUser } from '@clerk/clerk-expo';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { notifyNewMessage } from '../../notification/eventNotifications';
 import { notificationManager } from '../lib/NotificationManager';
 import { useSupabaseClient } from '../lib/supabaseConfig';
@@ -45,14 +45,17 @@ export function useMessages() {
         notificationManager.setHasUnreadMessages(hasUnread);
     }, [user]);
 
+    const isFetchingRef = useRef(false);
+
     const fetchMessages = useCallback(async (isInitial = true) => {
-        if (!user) {
-            console.log('[useMessages] No user found, skipping fetch');
-            setLoading(false);
+        if (!user || isFetchingRef.current) {
+            console.log('[useMessages] Skipping fetch: No user or already fetching');
+            if (!user) setLoading(false);
             return;
         }
 
         try {
+            isFetchingRef.current = true;
             if (isInitial) setLoading(true);
             setError(null);
             console.log(`[useMessages] Fetching for user: ${user.id} (${user.fullName})`);
@@ -165,6 +168,7 @@ export function useMessages() {
             setError(err instanceof Error ? err.message : 'Failed to fetch messages');
         } finally {
             if (isInitial) setLoading(false);
+            isFetchingRef.current = false;
         }
     }, [user, supabase, checkUnread]);
 

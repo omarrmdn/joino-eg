@@ -1123,7 +1123,7 @@ export default function AddScreen() {
             <View style={[styles.inputContainer, fieldErrors.title && styles.inputError]}>
               <TextInput
                 style={styles.input}
-                placeholder={t("create_event_title_placeholder") + " *"}
+                placeholder={t("create_event_title_placeholder")}
                 placeholderTextColor={fieldErrors.title ? Colors.error : Colors.gray}
                 value={title}
                 onChangeText={(text) => { setTitle(text); if (fieldErrors.title) setFieldErrors(prev => { const n = {...prev}; delete n.title; return n; }); }}
@@ -1143,6 +1143,9 @@ export default function AddScreen() {
                 textAlignVertical="top"
               />
             </View>
+            <Text style={styles.tipNote}>
+              {(t("create_event_description_tip" as any) || "Tip: You can write more details about the event or a detailed location here.")}
+            </Text>
 
             <Text style={styles.label}>{t("create_event_type_label")}</Text>
             <View style={[styles.typeSelector, fieldErrors.eventType && { borderWidth: 1, borderColor: Colors.error, borderRadius: 12, padding: 4 }]}>
@@ -1261,7 +1264,7 @@ export default function AddScreen() {
                   >
                     {startDate
                       ? startDate.toLocaleDateString()
-                      : t("create_event_start_date") + " *"}
+                      : t("create_event_start_date")}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1284,7 +1287,7 @@ export default function AddScreen() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : t("create_event_time") + " *"}
+                      : t("create_event_time")}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1331,7 +1334,7 @@ export default function AddScreen() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : t("create_event_end_time") + " *"}
+                      : t("create_event_end_time")}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1380,7 +1383,7 @@ export default function AddScreen() {
                 <View style={[styles.inputContainer, fieldErrors.capacity && styles.inputError]}>
                   <TextInput
                     style={styles.input}
-                    placeholder={t("create_event_capacity") + " *"}
+                    placeholder={t("create_event_capacity")}
                     placeholderTextColor={fieldErrors.capacity ? Colors.error : Colors.gray}
                     value={maxCapacity}
                     onChangeText={(text) => {
@@ -1396,7 +1399,7 @@ export default function AddScreen() {
                 <View style={[styles.inputContainer, fieldErrors.cost && styles.inputError]}>
                   <TextInput
                     style={styles.input}
-                    placeholder={t("create_event_cost") + " *"}
+                    placeholder={t("create_event_cost")}
                     placeholderTextColor={fieldErrors.cost ? Colors.error : Colors.gray}
                     value={cost}
                     onChangeText={(text) => {
@@ -1443,11 +1446,11 @@ export default function AddScreen() {
             </View>
 
             {/* Tags Input */}
-            <Text style={styles.label}>{t("create_event_tags_label") + " *"}</Text>
+            <Text style={styles.label}>{t("create_event_tags_label")}</Text>
             <View style={[styles.inputContainer, fieldErrors.tags && styles.inputError]}>
               <TextInput
                 style={styles.input}
-                placeholder={t("create_event_tags_placeholder") + " *"}
+                placeholder={t("create_event_tags_placeholder")}
                 placeholderTextColor={fieldErrors.tags ? Colors.error : Colors.gray}
                 value={tagInput}
                 onChangeText={handleTagInputChange}
@@ -1829,5 +1832,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: Fonts.bold,
     marginLeft: 8,
+  },
+  tipNote: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginLeft: 4,
   },
 });

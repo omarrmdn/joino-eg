@@ -20,7 +20,7 @@ import Animated, {
     FadeInRight,
     Layout,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../src/constants/Colors";
 import { PROMOTIONS_ENABLED } from "../../src/constants/FeatureFlags";
 import { Fonts } from "../../src/constants/Fonts";
@@ -51,6 +51,7 @@ export default function ProfileScreen() {
   const { t, language } = useLanguage();
   const { showAlert, showToast } = useAlert();
   const insets = useSafeAreaInsets();
+  const [searchText, setSearchText] = useState("");
   
   // Adapt our context to the shape expected by utils
   const currencyContext = React.useMemo(() => ({
@@ -276,17 +277,18 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView 
-      style={[styles.container, { paddingTop: insets.top }]} 
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={Colors.primary}
-        />
-      }
-    >
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+          />
+        }
+      >
       {analyticsError && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>
@@ -384,16 +386,45 @@ export default function ProfileScreen() {
       <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t("profile_interests")}</Text>
-          <TouchableOpacity onPress={() => setIsEditingInterests(!isEditingInterests)}>
+          <TouchableOpacity onPress={() => {
+            setIsEditingInterests(!isEditingInterests);
+            if (!isEditingInterests) {
+              setSearchText(""); // Reset search when opening
+            }
+          }}>
             <Text style={styles.editButton}>
               {isEditingInterests ? t("profile_done") : t("profile_edit")}
             </Text>
           </TouchableOpacity>
         </View>
         
+        {isEditingInterests && (
+          <View style={styles.searchBarContainer}>
+            <Ionicons name="search" size={18} color={Colors.gray} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={(t("profile_search_interests_placeholder" as any) || "Search interests...")}
+              placeholderTextColor={Colors.gray}
+              value={searchText}
+              onChangeText={setSearchText}
+              autoCapitalize="none"
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText("")}>
+                <Ionicons name="close-circle" size={18} color={Colors.gray} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        
         <View style={styles.tagsContainer}>
           {isEditingInterests ? (
-            tagObjects.map((tagObj, index) => (
+            tagObjects
+              .filter(tag => 
+                tag.label.toLowerCase().includes(searchText.toLowerCase()) || 
+                tag.name.toLowerCase().includes(searchText.toLowerCase())
+              )
+              .map((tagObj, index) => (
               <Animated.View 
                 key={tagObj.id} 
                 entering={FadeInRight.delay(index * 50)}
@@ -495,7 +526,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </Animated.View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -506,7 +538,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 10, // Reduced since using SafeAreaView
     paddingBottom: 100,
   },
   loadingContainer: {
@@ -641,6 +673,27 @@ const styles = StyleSheet.create({
   editButton: {
     color: Colors.primary,
     fontFamily: Fonts.medium,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.lightblack,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+    height: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.white,
+    fontFamily: Fonts.regular,
+    fontSize: 14,
+    height: '100%',
   },
   tagsContainer: {
     flexDirection: 'row',
