@@ -122,7 +122,7 @@ export async function notifyAttendeeEventAccessDetails(
       title,
       body,
       finalData,
-      true // Send local notification immediately
+      false // NotificationProvider handles local alerts via real-time
     );
 
     return { success: true };
@@ -204,7 +204,7 @@ export async function notifyAttendeeCancellationSelf(
       t('notification_attendee_cancel_confirmation_body', { title: event.title }),
 
       { event_id: eventId, event_title: event.title },
-      true // Send local notification immediately
+      false // NotificationProvider handles local alerts via real-time
     );
 
     return { success: true };
@@ -294,11 +294,7 @@ export async function notifyNewQuestion(
       event_id: eventId,
       question_id: questionId,
       event_title: event.title,
-      create_message: true,
-      message_type: 'general',
-      sender_id: askerId,
-      recipient_id: organizerId,
-      message_body: questionText,
+      // Removed create_message: true to avoid duplication in Chat UI which already fetches from event_questions
       asker_name: askerName,
       question_text: questionText,
     };
@@ -327,7 +323,7 @@ export async function notifyNewQuestion(
           event_title: event.title,
           question_text: questionText
         },
-        true // Send local notification immediately
+        false // NotificationProvider handles local alerts via real-time
       );
 
 
@@ -372,11 +368,7 @@ export async function notifyQuestionAnswer(
 
     const enrichedData: PushNotificationData = {
       ...notificationData,
-      create_message: true,
-      message_type: 'general',
-      sender_id: event.organizer_id, // Organizer is answering
-      recipient_id: attendeeId,
-      message_body: body,
+      // Removed create_message: true to avoid duplication in Chat UI which already fetches from event_questions
       answer_text: body, // Or just use body
       asker_name: organizerName // Organizer name as sender
     };
@@ -505,7 +497,7 @@ export async function notifyEventCancellation(
           title,
           t('event_cancel_success'),
           notificationData,
-          true // Send local notification immediately
+          false // NotificationProvider handles local alerts via real-time
         );
       }
     } catch (e) {

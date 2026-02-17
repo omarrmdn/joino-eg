@@ -39,7 +39,7 @@ export function usePushNotifications() {
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'Default',
-                importance: Notifications.AndroidImportance.MAX,
+                importance: 5, // AndroidImportance.MAX (Ensures heads-up notification)
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#FF231F7C',
             });

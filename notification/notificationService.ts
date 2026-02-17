@@ -71,7 +71,7 @@ async function ensureAndroidChannel(): Promise<void> {
   try {
     await Notifications.setNotificationChannelAsync("default", {
       name: "Default",
-      importance: 4, // AndroidImportance.MAX
+      importance: 5, // AndroidImportance.MAX (Ensures heads-up notification)
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FF5B04",
       sound: "default",
