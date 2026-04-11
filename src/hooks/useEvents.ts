@@ -217,11 +217,17 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
                     )
                 `);
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const todayStr = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0')
+      ].join('-');
+
       queryBuilder = queryBuilder
         .neq('status', 'ended')
         .neq('status', 'canceled')
-        .gte('date', todayStr);
+        .or(`date.gte.${todayStr},end_date.gte.${todayStr}`);
 
       if (searchQuery && searchQuery.trim().length > 0) {
         const trimmedQuery = searchQuery.trim();

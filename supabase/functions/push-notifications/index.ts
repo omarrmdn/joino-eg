@@ -58,12 +58,28 @@ serve(async (req: Request) => {
 
                 console.log('[Push] Inserting message:', JSON.stringify(messagePayload));
 
-                const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert(messagePayload).select().single();
+                // Idempotency check: don't insert if an identical message was created in the last 60 seconds
+                const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
+                const { data: existingMsg } = await supabase
+                    .from('messages')
+                    .select('id')
+                    .eq('sender_id', senderId)
+                    .eq('recipient_id', recipientId)
+                    .eq('body', messagePayload.body)
+                    .eq('event_id', eventId)
+                    .gt('created_at', sixtySecondsAgo)
+                    .maybeSingle();
 
-                if (msgError) {
-                    console.error('[Push] Message creation failed:', JSON.stringify(msgError));
+                if (existingMsg) {
+                    console.log('[Push] Duplicate message detected within 60s, skipping insert. Existing ID:', existingMsg.id);
                 } else {
-                    console.log('[Push] Message created successfully. ID:', insertedMsg?.id);
+                    const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert(messagePayload).select().single();
+
+                    if (msgError) {
+                        console.error('[Push] Message creation failed:', JSON.stringify(msgError));
+                    } else {
+                        console.log('[Push] Message created successfully. ID:', insertedMsg?.id);
+                    }
                 }
             }
         }

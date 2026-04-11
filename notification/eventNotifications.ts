@@ -92,6 +92,11 @@ export async function notifyAttendeeEventAccessDetails(
         : `This is an onsite event, but the organizer hasn't added a specific location yet.`;
     }
 
+    // For onsite events, generate a Google Maps search link for the location
+    const accessLink = isOnline
+      ? event.link
+      : (event.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}` : null);
+
     // Send push notification (triggers message creation via Edge Function)
     // Always create a message for the inbox so the user has a record of the location/link
     const finalData = {
@@ -102,7 +107,7 @@ export async function notifyAttendeeEventAccessDetails(
       message_type: 'event_link' as const,
       message_body: body,
       message_subject: title,
-      link: event.link
+      link: accessLink
     };
 
     console.log('[notifyAttendeeEventAccessDetails] Sending notification:', {

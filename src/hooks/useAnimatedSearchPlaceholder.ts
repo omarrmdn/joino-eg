@@ -117,23 +117,26 @@ export const useAnimatedSearchPlaceholder = (options: AnimatedPlaceholderOptions
         charIndex += 1;
       }
 
+      // Add a cursor character to enhance the typing visual
+      const cursor = charIndex < word.length || !isDeleting ? "|" : "";
       const nextValue = word.substring(0, charIndex);
-      setPlaceholder(nextValue.length > 0 ? nextValue : " ");
+
+      setPlaceholder(nextValue.length > 0 ? `${nextValue}${cursor}` : " ");
 
       if (!isDeleting && charIndex >= word.length) {
         isDeleting = true;
-        timeout = setTimeout(tick, 900);
+        timeout = setTimeout(tick, 1100); // Wait longer while showing full word
         return;
       }
 
       if (isDeleting && charIndex <= 0) {
         isDeleting = false;
         wordIndex += 1;
-        timeout = setTimeout(tick, 350);
+        timeout = setTimeout(tick, 400); // Wait before starting next word
         return;
       }
 
-      timeout = setTimeout(tick, isDeleting ? 45 : 75);
+      timeout = setTimeout(tick, isDeleting ? 40 : 80);
     };
 
     timeout = setTimeout(tick, 300);

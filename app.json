@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Joino",
-    "slug": "joino",
+    "name": "Joyin",
+    "slug": "joyin",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
-    "scheme": "joino",
+    "icon": "./assets/logoredsharp.png",
+    "scheme": "joyin",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#000000",
     "androidNavigationBar": {
@@ -17,11 +17,11 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.joino.app",
+      "package": "com.joyin.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FF5B04",
-        "foregroundImage": "./assets/logo.png"
+        "foregroundImage": "./assets/logoredsharp.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -36,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logo.png",
+          "image": "./assets/logoredsharp.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FF5B04",
@@ -48,7 +48,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/logo.png",
+          "icon": "./assets/logored.png",
           "color": "#FF5B04",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true
@@ -65,7 +65,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8d20b8c5-e1c1-4380-88ec-4a7706150107"
+        "projectId": "189370cd-18a1-455a-a72a-769d33595334"
       }
     },
     "runtimeVersion": {
@@ -75,8 +75,8 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/8d20b8c5-e1c1-4380-88ec-4a7706150107"
+      "url": "https://u.expo.dev/189370cd-18a1-455a-a72a-769d33595334"
     },
-    "owner": "omar2rmdn"
+    "owner": "omar3rmdn"
   }
 }

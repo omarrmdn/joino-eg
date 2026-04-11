@@ -32,7 +32,7 @@ export default function SearchScreen() {
   const params = useLocalSearchParams();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
-  const isRtl = language === "ar" || language === "ar-EG";
+  const isRtl = language === "ar-EG";
   
   const [searchQuery, setSearchQuery] = useState((params.q as string) || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
@@ -111,7 +111,7 @@ export default function SearchScreen() {
             <Ionicons
               name="search"
               size={20}
-              color={Colors.textSecondary}
+              color={Colors.gray}
               style={styles.searchIcon}
             />
             <TextInput
@@ -119,7 +119,7 @@ export default function SearchScreen() {
                 styles.input
               ]}
               placeholder={t("search_input_placeholder")}
-              placeholderTextColor={Colors.textSecondary}
+              placeholderTextColor={Colors.gray}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoFocus={!params.q}
@@ -158,7 +158,7 @@ export default function SearchScreen() {
                 <TextInput
                   style={styles.priceInput}
                   placeholder="E£ 0.00"
-                  placeholderTextColor={Colors.textSecondary}
+                  placeholderTextColor={Colors.gray}
                   keyboardType="numeric"
                   value={maxPrice}
                   onChangeText={setMaxPrice}
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     height: 55,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: Colors.gray,
   },
   searchIcon: {
     marginRight: 10,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.medium,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Colors.gray,
   },
   segmentedControl: {
     flexDirection: 'row',

@@ -9,12 +9,12 @@ type Event = {
 };
 
 export const shareEvent = async (event: Event) => {
-  const eventUrl = `https://joino.app/event/${event.id}`;
+  const eventUrl = `https://joyin.app/event/${event.id}`;
 
   const message =
     `I’m going to this 🎟️✨\n` +
     `**${event.title}**\n` +
-    `Join me on Joino 📍🔥\n\n` +
+    `Join me on Joyin 📍🔥\n\n` +
     eventUrl;
 
   try {

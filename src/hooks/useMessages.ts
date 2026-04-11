@@ -155,14 +155,30 @@ export function useMessages() {
                 return msgs;
             });
 
-            // Combine messages and sorted by created_at desc
-            const allMessages = [
+            // Combine messages and questions
+            const combined = [
                 ...uniqueMsgData,
                 ...normalizedQuestions
-            ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+            ];
 
-            console.log(`[useMessages] Combined into ${allMessages.length} total message units for display`);
-            setMessages(allMessages);
+            // Aggressive deduplication: remove items with same sender, recipient, body, and event_id
+            // that occurred within a 2-minute window (preferring the richer message table data if both exist)
+            const finalDeduped: DBMessage[] = [];
+            combined.sort((a, b) => b.created_at.localeCompare(a.created_at)).forEach(msg => {
+                const isDuplicate = finalDeduped.some(existing =>
+                    existing.sender_id === msg.sender_id &&
+                    existing.recipient_id === msg.recipient_id &&
+                    existing.body === msg.body &&
+                    existing.event_id === msg.event_id &&
+                    Math.abs(new Date(existing.created_at).getTime() - new Date(msg.created_at).getTime()) < 120000
+                );
+                if (!isDuplicate) {
+                    finalDeduped.push(msg);
+                }
+            });
+
+            console.log(`[useMessages] Combined into ${finalDeduped.length} total message units for display`);
+            setMessages(finalDeduped);
         } catch (err) {
             console.error('[useMessages] error fetching messages:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch messages');
@@ -244,7 +260,10 @@ export function useMessages() {
                 );
             }
 
-            setMessages(prev => [data, ...prev]);
+            setMessages(prev => {
+                if (prev.some(m => m.id === data.id)) return prev;
+                return [data, ...prev];
+            });
             trackAction('message_send', {
                 messageId: data.id,
                 eventId: data.event_id,

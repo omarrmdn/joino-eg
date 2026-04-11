@@ -675,7 +675,7 @@ function formatWithSymbol(
   const symbol = currency.symbol || currency.code;
   const useSpace =
     symbol.length > 1 || /^[A-Z]{2,4}$/.test(symbol) || /^[A-Z]{2,4}$/.test(currency.code);
-  if (language === "ar" || language === "ar-EG") {
+  if (language === "ar-EG") {
     return useSpace ? `${value} ${symbol}` : `${value}${symbol}`;
   }
   return useSpace ? `${symbol} ${value}` : `${symbol}${value}`;
@@ -691,8 +691,8 @@ export function formatEventPrice(
 ) {
   const language = options.language || "en";
   const numeric = parseCurrencyNumber(priceValue);
-  if (!Number.isFinite(numeric)) return (language === "ar" || language === "ar-EG") ? "مجاني" : "Free";
-  if (numeric === 0) return (language === "ar" || language === "ar-EG") ? "مجاني" : "Free";
+  if (!Number.isFinite(numeric)) return (language === "ar-EG") ? "مجاني" : "Free";
+  if (numeric === 0) return (language === "ar-EG") ? "مجاني" : "Free";
 
   const eventCode =
     normalizeCurrencyCode(options.eventCurrencyCode) || DEFAULT_CURRENCY_CODE;
@@ -729,7 +729,7 @@ export function formatEventPrice(
   const fallbackCurrency: CurrencyInfo = {
     code: DEFAULT_CURRENCY_CODE,
     name: DEFAULT_CURRENCY_CODE,
-    symbol: DEFAULT_CURRENCY_CODE === "EGP" ? (language === "ar" || language === "ar-EG" ? "ج.م" : "EGP") : (language === "ar" || language === "ar-EG" ? "USD" : "$"),
+    symbol: DEFAULT_CURRENCY_CODE === "EGP" ? (language === "ar-EG" ? "ج.م" : "EGP") : (language === "ar-EG" ? "USD" : "$"),
     decimal_places: 2,
   };
   return formatWithSymbol(numeric, fallbackCurrency, language);
@@ -780,7 +780,7 @@ export function formatCurrencyAmount(
   const fallbackCurrency: CurrencyInfo = {
     code: DEFAULT_CURRENCY_CODE,
     name: DEFAULT_CURRENCY_CODE,
-    symbol: DEFAULT_CURRENCY_CODE === "EGP" ? (language === "ar" || language === "ar-EG" ? "ج.م" : "EGP") : (language === "ar" || language === "ar-EG" ? "USD" : "$"),
+    symbol: DEFAULT_CURRENCY_CODE === "EGP" ? (language === "ar-EG" ? "ج.م" : "EGP") : (language === "ar-EG" ? "USD" : "$"),
     decimal_places: 2,
   };
   return formatWithSymbol(numeric, fallbackCurrency, language);

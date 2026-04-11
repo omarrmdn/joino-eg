@@ -2,7 +2,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
     ActivityIndicator,
@@ -25,6 +25,7 @@ import { useSupabaseClient } from "../src/lib/supabaseConfig";
 export default function ReportBugScreen() {
   const { user } = useUser();
   const router = useRouter();
+  const { eventId } = useLocalSearchParams();
   const { t, language } = useLanguage();
   const supabase = useSupabaseClient();
   const { showAlert } = useAlert();
@@ -65,7 +66,7 @@ export default function ReportBugScreen() {
     if (!description.trim()) {
       showAlert({
         title: t("error_title"),
-        message: "Please describe the bug.",
+        message: t("bug_report_description_error"),
         type: 'warning',
       });
       return;
@@ -103,7 +104,7 @@ export default function ReportBugScreen() {
         .from("bug_reports")
         .insert({
           user_id: user?.id,
-          description: description.trim(),
+          description: eventId ? `[Event ID: ${eventId}] ${description.trim()}` : description.trim(),
           images: uploadedUrls,
           status: 'open',
           created_at: new Date().toISOString(),
@@ -112,16 +113,16 @@ export default function ReportBugScreen() {
       if (insertError) throw insertError;
 
       showAlert({
-        title: "Success",
-        message: "Your bug report has been submitted. Thank you for helping us improve!",
+        title: t("profile_update_success"),
+        message: t("report_bug_success"),
         type: 'success',
       });
       router.back();
     } catch (error: any) {
       console.error("Bug report error:", error);
       showAlert({
-        title: "Error",
-        message: error.message || "Failed to submit bug report. Please try again later.",
+        title: t("error_title"),
+        message: t("report_bug_error"),
         type: 'error',
       });
     } finally {
@@ -133,9 +134,9 @@ export default function ReportBugScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+          <Ionicons name={language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Report a Bug</Text>
+        <Text style={styles.headerTitle}>{t("report_bug_title")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -144,11 +145,11 @@ export default function ReportBugScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.label}>What went wrong?</Text>
+          <Text style={styles.label}>{t("bug_report_description_label")}</Text>
           <TextInput
-            style={styles.input}
-            placeholder="Describe the issue in detail..."
-            placeholderTextColor={Colors.textSecondary}
+            style={[styles.input, language === 'ar-EG' && { textAlign: 'right' }]}
+            placeholder={t("bug_report_description_placeholder")}
+            placeholderTextColor={Colors.gray}
             multiline
             numberOfLines={6}
             value={description}
@@ -156,7 +157,7 @@ export default function ReportBugScreen() {
             textAlignVertical="top"
           />
 
-          <Text style={styles.label}>Add Screenshots (Max 3)</Text>
+          <Text style={styles.label}>{t("bug_report_images_label")}</Text>
           <View style={styles.imageRow}>
             {images.map((uri, index) => (
               <View key={index} style={styles.imagePreviewContainer}>
@@ -172,7 +173,7 @@ export default function ReportBugScreen() {
             {images.length < 3 && (
               <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
                 <Ionicons name="camera-outline" size={32} color={Colors.primary} />
-                <Text style={styles.addImageText}>Add Image</Text>
+                <Text style={styles.addImageText}>{t("bug_report_add_image")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -185,7 +186,7 @@ export default function ReportBugScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.submitButtonText}>Submit Report</Text>
+              <Text style={styles.submitButtonText}>{t("bug_report_submit")}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 150,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: Colors.gray,
   },
   imageRow: {
     flexDirection: "row",

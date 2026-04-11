@@ -49,9 +49,9 @@ export default function HomeScreen() {
     setActiveTag(allTagLabel);
   }, [allTagLabel]);
 
-  // Scroll animation values - DISABLED for stability
-  // The header will now remain static to prevent disappearing/stuck issues
+  // Scroll animation values
   const scrollY = React.useRef(new Animated.Value(0)).current;
+  const headerHeight = 110; 
 
   const [userLocation, setUserLocation] =
     useState<Location.LocationObject | null>(null);
@@ -569,15 +569,14 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={["left", "right"]}>
-      <StatusBar barStyle="light-content" translucent={true} backgroundColor={Colors.black} />
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
 
       <Animated.View
         style={[
           styles.headerWrapper, 
           { 
-            // transform: [{ translateY }], // Disabled animation
-            paddingTop: insets.top + 10,
+            paddingTop: insets.top,
           }
         ]}
       >
@@ -624,7 +623,7 @@ export default function HomeScreen() {
           contentContainerStyle={[
             styles.listContent,
             { 
-              paddingTop: insets.top + 180, // Safe area + Header height
+              paddingTop: insets.top + 155, // Safe area + Header height
               paddingBottom: insets.bottom + 120 
             }
           ]}
@@ -642,7 +641,7 @@ export default function HomeScreen() {
           contentContainerStyle={[
             styles.listContent,
             { 
-              paddingTop: insets.top + 180, // Safe area + Header height
+              paddingTop: insets.top + 155, // Safe area + Header height
               paddingBottom: insets.bottom + 120 
             }
           ]}
@@ -652,10 +651,13 @@ export default function HomeScreen() {
               onRefresh={handleRefresh}
               tintColor={Colors.primary}
               titleColor={Colors.primary}
-              progressViewOffset={insets.top + 180}
+              progressViewOffset={insets.top + 155}
             />
           }
-          // onScroll removed to disable animation drive
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
           scrollEventThrottle={16}
         />
       )}
@@ -680,7 +682,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    paddingTop: 10, // Space below status bar
+    paddingTop: 0,
     paddingBottom: 5, // Space below TagsBar
   },
   listContent: {

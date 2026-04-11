@@ -70,7 +70,7 @@ export default function EventDetailsScreen() {
   const [ratingSubmitting, setRatingSubmitting] = React.useState(false);
   const { t, language } = useLanguage();
   const { showAlert } = useAlert();
-  const isRTL = language === "ar";
+  const isRTL = language === "ar-EG";
   const recurringLabel = React.useMemo(
     () =>
       eventData
@@ -198,8 +198,8 @@ export default function EventDetailsScreen() {
 
     if (!user || !eventData) {
       showAlert({
-        title: "Error",
-        message: "You must be logged in to join events",
+        title: t("error_title"),
+        message: t("error_login_required"),
         type: 'error',
       });
       return;
@@ -226,6 +226,56 @@ export default function EventDetailsScreen() {
     setIsJoining(true);
     trackAction("initiate_join", { eventId: eventData.id, title: eventData.title });
 
+    // Check for overlapping events
+    try {
+      const { data: currentAttendees, error: attendeesError } = await supabase
+        .from("attendees")
+        .select("event_id")
+        .eq("user_id", user.id);
+
+      if (attendeesError) throw attendeesError;
+
+      if (currentAttendees && currentAttendees.length > 0) {
+        const eventIds = currentAttendees.map(a => a.event_id);
+        const { data: attendingEvents, error: eventsError } = await supabase
+          .from("events")
+          .select("id, title, date, time, end_date, end_time, status")
+          .in("id", eventIds);
+
+        if (eventsError) throw eventsError;
+
+        if (attendingEvents) {
+          const filteredEvents = attendingEvents.filter(e => e.status !== "canceled" && e.status !== "ended");
+          
+          const newStart = new Date(`${eventData.rawDate}T${eventData.rawTime || '00:00:00'}`).getTime();
+          const newEnd = new Date(`${eventData.rawEndDate || eventData.rawDate}T${eventData.rawEndTime || eventData.rawTime || '23:59:59'}`).getTime();
+
+          if (!isNaN(newStart) && !isNaN(newEnd)) {
+            const overlap = filteredEvents.find(e => {
+              if (e.id === eventData.id) return false;
+              const eStart = new Date(`${e.date}T${e.time || '00:00:00'}`).getTime();
+              const eEnd = new Date(`${e.end_date || e.date}T${e.end_time || e.time || '23:59:59'}`).getTime();
+              
+              if (isNaN(eStart) || isNaN(eEnd)) return false;
+              return newStart < eEnd && newEnd > eStart;
+            });
+
+            if (overlap) {
+              showAlert({
+                title: t("error_title"),
+                message: `${t("error_event_overlap")} (${overlap.title})`,
+                type: 'error',
+              });
+              setIsJoining(false);
+              return;
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Overlap check error:", err);
+    }
+
     try {
       const { error: joinError } = await supabase.from("attendees").insert({
         event_id: id,
@@ -235,8 +285,8 @@ export default function EventDetailsScreen() {
       if (joinError) {
         if (joinError.code === "23505") {
           showAlert({
-            title: "Info",
-            message: "You have already joined this event",
+            title: t("info_title"),
+            message: t("event_already_joined"),
             type: 'info',
           });
         } else {
@@ -295,8 +345,8 @@ export default function EventDetailsScreen() {
         notificationManager.setHasUnreadNotifications(true);
         notificationManager.setHasUnreadEvents(true);
         showAlert({
-          title: "Success",
-          message: "You have joined the event!",
+          title: t("success_title"),
+          message: t("event_join_success"),
           type: 'success',
         });
         setIsAttending(true);
@@ -339,6 +389,14 @@ export default function EventDetailsScreen() {
         .eq("user_id", user.id);
 
       if (cancelError) throw cancelError;
+      
+      // Remove event access details from inbox since they are no longer attending
+      await supabase
+        .from("messages")
+        .delete()
+        .eq("event_id", eventData.id)
+        .eq("recipient_id", user.id)
+        .eq("message_type", "event_link");
 
       // Update user spend and organizer revenue (decrement)
       const eventPrice = parseCurrencyNumber(eventData.price);
@@ -393,8 +451,8 @@ export default function EventDetailsScreen() {
       notificationManager.setHasUnreadNotifications(true);
       notificationManager.setHasUnreadEvents(true);
       showAlert({
-        title: "Cancelled",
-        message: "Your attendance has been cancelled.",
+        title: t("event_canceled"),
+        message: t("event_cancel_attendance_success"),
         type: 'info',
       });
       setIsAttending(false);
@@ -691,7 +749,7 @@ export default function EventDetailsScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+          <Ionicons name={language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.logo}>{t("event_details_title")}</Text>
         <View style={styles.headerRight}>
@@ -711,6 +769,19 @@ export default function EventDetailsScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="share-outline" size={24} color={Colors.white} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              if (!eventData) return;
+              router.push({
+                pathname: "/report-bug",
+                params: { eventId: eventData.id }
+              });
+            }}
+            style={styles.shareHeaderButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="flag-outline" size={24} color={Colors.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -777,6 +848,16 @@ export default function EventDetailsScreen() {
 
         {/* Details: Location, Date/Time, Price, Gender */}
         <View style={styles.detailsContainer}>
+          {/* Free Event Notice */}
+          {parseCurrencyNumber(eventData.price) === 0 && (
+            <View style={styles.freeNoticeContainer}>
+              <Ionicons name="alert-circle" size={20} color={Colors.primary} />
+              <Text style={styles.freeNoticeText}>
+                This event is free. If the organizer asks for money, please report it to remove the event.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.detailRow}>
             <View style={styles.detailItem}>
               <Ionicons 
@@ -791,6 +872,19 @@ export default function EventDetailsScreen() {
               <Text style={styles.detailText}>{dateLabel} - {eventData.time}</Text>
             </View>
           </View>
+
+          {/* Automatical location/link delivery tips - Positioned above price */}
+          {!isOrganizer && !isAttending && eventData.status !== "canceled" && !isEnded && (
+            <View style={[styles.joinTipContainer, { marginTop: 15, marginBottom: 0 }]}>
+              <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
+              <Text style={styles.joinTipText}>
+                {eventData.isOnline 
+                  ? t("event_online_link_auto_tip" as any)
+                  : t("event_onsite_location_auto_tip" as any)
+                }
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.detailRow, { marginTop: 15 }]}>
             <View style={styles.priceGenderRow}>
@@ -864,7 +958,7 @@ export default function EventDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>{t("event_about")}</Text>
           <Text style={styles.descriptionText}>
-            {eventData.description && eventData.description.trim() ? eventData.description : "No description provided."}
+            {eventData.description && eventData.description.trim() ? eventData.description : t("event_no_description")}
           </Text>
         </View>
 
@@ -904,7 +998,7 @@ export default function EventDetailsScreen() {
                   >
                     <Ionicons
                       name={
-                        language === "ar"
+                        language === "ar-EG"
                           ? "arrow-back-circle"
                           : "arrow-forward-circle"
                       }
@@ -943,32 +1037,10 @@ export default function EventDetailsScreen() {
         )}
 
         {/* Edit / Join / Cancel Button */}
-        {/* Automatical location/link delivery tips */}
-        {!isOrganizer && !isAttending && eventData.status !== "canceled" && !isEnded && (
-          <View style={styles.joinTipContainer}>
-            <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.joinTipText}>
-              {eventData.isOnline 
-                ? (t("event_online_link_auto_tip" as any) || "Tip: Event link will be sent automatically to attendees.")
-                : (t("event_onsite_location_auto_tip" as any) || "Tip: Event location will be sent automatically to attendees.")
-              }
-            </Text>
-          </View>
-        )}
+        {/* Automatical location/link delivery tips moved up */}
 
         {isOrganizer ? (
           <View style={styles.organizerActions}>
-            <Button
-              title={t("event_edit")}
-              onPress={() =>
-                router.push({
-                  pathname: "/add",
-                  params: { editId: eventData.id },
-                })
-              }
-              style={[styles.joinButtonMargin, { flex: 1.2 }]}
-              textStyle={{ color: Colors.white }}
-            />
             {eventData.status !== "canceled" && (
               <Button
                 title={t("event_cancel_event")}
@@ -977,14 +1049,31 @@ export default function EventDetailsScreen() {
                   styles.joinButtonMargin, 
                   { 
                     flex: 1, 
-                    backgroundColor: Colors.inputBackground || '#1A1A1A',
-                    borderWidth: 1,
-                    borderColor: Colors.error,
+                    backgroundColor: Colors.error,
                   }
                 ]}
-                textStyle={{ color: Colors.error }}
+                textStyle={{ color: Colors.white }}
               />
             )}
+            <Button
+              title={t("event_edit")}
+              onPress={() =>
+                router.push({
+                  pathname: "/add",
+                  params: { editId: eventData.id },
+                })
+              }
+              style={[
+                styles.joinButtonMargin, 
+                { 
+                  flex: 1.2,
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: Colors.primary,
+                }
+              ]}
+              textStyle={{ color: Colors.primary }}
+            />
           </View>
         ) : isAttending ? (
           <Button
@@ -1087,7 +1176,7 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
   const [answerText, setAnswerText] = React.useState(question.answer || "");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const canAnswer = isOrganizer && !question.answer;
-  const isRTL = language === "ar" || language === "ar-EG";
+  const isRTL = language === "ar-EG";
   const hasOrganizerAnswer = !!question.answer && !!question.organizer_id;
 
   const handleSubmit = async () => {
@@ -1128,7 +1217,7 @@ const QuestionItem = ({ question, isOrganizer, onAnswer, language, t }: Question
               <ActivityIndicator size="small" color={Colors.white} />
             ) : (
               <Ionicons
-                name={language === "ar" ? "arrow-back" : "arrow-forward"}
+                name={language === "ar-EG" ? "arrow-back" : "arrow-forward"}
                 size={16}
                 color={Colors.white}
               />
@@ -1395,18 +1484,19 @@ const styles = StyleSheet.create({
   },
   joinTipContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 15,
-    marginBottom: 5,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    marginTop: 0,
+    marginBottom: 15,
     gap: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
   },
   joinTipText: {
     color: Colors.textSecondary,
     fontSize: 12,
     fontFamily: Fonts.medium,
-    textAlign: 'center',
+    textAlign: 'left',
+    flex: 1,
   },
   questionsList: {
     marginTop: 8,
@@ -1527,5 +1617,24 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     fontSize: 14,
     lineHeight: 20,
+  },
+  freeNoticeContainer: {
+    backgroundColor: Colors.primary + '15',
+    padding: 15,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+    borderStyle: 'dashed',
+  },
+  freeNoticeText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+    flex: 1,
+    lineHeight: 18,
   },
 });

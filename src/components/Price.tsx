@@ -33,7 +33,7 @@ export const Price: React.FC<PriceProps> = ({ amount, currencyCode, style }) => 
   if (amount === 0) {
     return (
       <Text style={[styles.free, style]}>
-        {language === 'ar' || language === 'ar-EG' ? 'مجاني' : 'Free'}
+        {language === 'ar-EG' ? 'مجاني' : 'Free'}
       </Text>
     );
   }

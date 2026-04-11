@@ -19,7 +19,7 @@ interface TopBarProps {
 export const TopBar = React.memo(({ searchQuery, onSearchChange: _onSearchChange, onLocationPress, refreshToken }: TopBarProps) => {
   const router = useRouter();
   const { language } = useLanguage();
-  const isRtl = language === "ar" || language === "ar-EG";
+  const isRtl = language === "ar-EG";
   
   const { hasUnreadNotifications, hasUnreadMessages, hasUnreadEvents } = useNotifications();
   const hasAnythingNew = hasUnreadNotifications || hasUnreadMessages || hasUnreadEvents;
@@ -86,8 +86,8 @@ export const TopBar = React.memo(({ searchQuery, onSearchChange: _onSearchChange
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
+    paddingTop: 6,
     backgroundColor: Colors.black,
-   
   },
   header: {
     flexDirection: 'row',
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
   },
   placeholderText: {
-    color: Colors.textSecondary,
+    color: Colors.gray,
   },
   locationButton: {
     backgroundColor: Colors.darkflame,

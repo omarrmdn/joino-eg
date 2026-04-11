@@ -6,6 +6,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { PostHogProvider } from "posthog-react-native";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import 'react-native-url-polyfill/auto';
 import { NotificationProvider } from "../notification/NotificationProvider";
 import { unregisterPushToken, usePushNotifications } from "../notification/usePushNotifications";
@@ -138,19 +139,21 @@ function RootLayout() {
             captureScreens: true,
           }}
         >
-          <LanguageProvider>
-            <CurrencyProvider>
-              <NotificationProvider>
-                <AlertProvider>
-                  <RootContent 
-                    appIsReady={appIsReady} 
-                    showOnboarding={showOnboarding} 
-                    setShowOnboarding={setShowOnboarding}
-                  />
-                </AlertProvider>
-              </NotificationProvider>
-            </CurrencyProvider>
-          </LanguageProvider>
+          <SafeAreaProvider>
+            <LanguageProvider>
+              <CurrencyProvider>
+                <NotificationProvider>
+                  <AlertProvider>
+                    <RootContent 
+                      appIsReady={appIsReady} 
+                      showOnboarding={showOnboarding} 
+                      setShowOnboarding={setShowOnboarding}
+                    />
+                  </AlertProvider>
+                </NotificationProvider>
+              </CurrencyProvider>
+            </LanguageProvider>
+          </SafeAreaProvider>
         </PostHogProvider>
       </ClerkLoaded>
     </ClerkProvider>

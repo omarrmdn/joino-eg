@@ -40,6 +40,13 @@ export default function EventsScreen() {
     try {
       setLoading(true);
       
+      const now = new Date();
+      const todayStr = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0')
+      ].join('-');
+
       // 1. Fetch events organized by the user
       const { data: organizedData, error: organizedError } = await supabase
         .from('events')
@@ -61,7 +68,7 @@ export default function EventsScreen() {
         .eq('organizer_id', user.id)
         .neq('status', 'ended')
         .neq('status', 'canceled')
-        .gte('date', new Date().toISOString().split('T')[0]);
+        .or(`date.gte.${todayStr},end_date.gte.${todayStr}`);
 
       if (organizedError) throw organizedError;
 
@@ -100,7 +107,7 @@ export default function EventsScreen() {
             `)
             .in('id', uniqueAttendedIds)
             .neq('status', 'ended')
-            .gte('date', new Date().toISOString().split('T')[0]);
+            .or(`date.gte.${todayStr},end_date.gte.${todayStr}`);
 
           if (attendedError) throw attendedError;
           allEventsData = [...allEventsData, ...(attendedData || [])];
@@ -159,13 +166,6 @@ export default function EventsScreen() {
 
       setEvents(uniqueMapped);
       
-      const now = new Date();
-      const todayStr = [
-        now.getFullYear(),
-        String(now.getMonth() + 1).padStart(2, '0'),
-        String(now.getDate()).padStart(2, '0')
-      ].join('-');
-
       // Auto-select Today if it has events, or the first upcoming date, or just the first date
       const uniqueDates = Array.from(new Set(mapped.map(e => e.rawDate))).sort();
       if (uniqueDates.length > 0) {
@@ -223,7 +223,11 @@ export default function EventsScreen() {
 
   const filteredEvents = useMemo(() => {
     if (!selectedDate) return [];
-    return events.filter(e => e.rawDate === selectedDate);
+    return events.filter(e => {
+      if (e.rawDate === selectedDate) return true;
+      if (e.rawEndDate && selectedDate >= e.rawDate && selectedDate <= e.rawEndDate) return true;
+      return false;
+    });
   }, [events, selectedDate]);
 
   if (loading && events.length === 0) {
@@ -239,7 +243,7 @@ export default function EventsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+          <Ionicons name={language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("events_my_events_title")}</Text>
         <View style={styles.menuButton} />

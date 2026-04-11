@@ -25,8 +25,6 @@ export default function OnboardingScreen({ onFinish }: { onFinish: () => void })
   const toggleLanguage = () => {
     if (language === 'en') {
       setLanguage('ar-EG');
-    } else if (language === 'ar-EG') {
-      setLanguage('ar');
     } else {
       setLanguage('en');
     }
@@ -66,7 +64,7 @@ export default function OnboardingScreen({ onFinish }: { onFinish: () => void })
         activeOpacity={0.7}
       >
         <Text style={styles.languageButtonText}>
-          {language === 'en' ? 'مصري' : language === 'ar-EG' ? 'عربي' : 'EN'}
+          {language === 'en' ? 'مصري' : 'EN'}
         </Text>
       </TouchableOpacity>
 

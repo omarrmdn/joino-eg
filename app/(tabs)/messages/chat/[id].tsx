@@ -178,7 +178,7 @@ export default function ChatScreen() {
             onPress={onBackPress}
             style={styles.backButton}
           >
-             <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
+             <Ionicons name={language === 'ar-EG' ? "chevron-forward" : "chevron-back"} size={28} color={Colors.white} />
           </TouchableOpacity>
           
           <View style={styles.headerProfileContainer}>

@@ -103,6 +103,7 @@ export interface EventCardData {
   latitude: number | null;
   longitude: number | null;
   rawDate: string;
+  rawEndDate?: string | null;
   rawTime?: string;
   isAttending?: boolean;
   isOnline: boolean;
@@ -113,6 +114,7 @@ export interface EventCardData {
   recurrencePattern?: "daily" | "weekly" | "biweekly" | "monthly" | "custom" | null;
   recurrenceDays?: number[] | null;
   isPromoted?: boolean;
+  rawEndTime?: string | null;
 }
 
 // Helper function to transform database Event to EventCardData
@@ -254,5 +256,7 @@ export function transformEventToCardData(
     recurrencePattern: event.recurrence_pattern || null,
     recurrenceDays: event.recurrence_days || null,
     isPromoted: !!(event as any).is_promoted || !!(event as any).isPromoted,
+    rawEndDate: event.end_date || null,
+    rawEndTime: event.end_time || null,
   };
 }

@@ -2,13 +2,14 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import * as Updates from "expo-updates";
 import React from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -54,8 +55,12 @@ export default function SettingsScreen() {
     });
   };
 
-  const handleChangeLanguage = async (lang: "en" | "ar" | "ar-EG") => {
+  const handleChangeLanguage = async (lang: "en" | "ar-EG") => {
     await setLanguage(lang);
+    // Point 4 & 9: Reload app to apply language changes fully and avoid problems with other langs
+    setTimeout(() => {
+      Updates.reloadAsync();
+    }, 500);
   };
 
   return (
@@ -63,7 +68,7 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons
-            name={language === "ar" || language === "ar-EG" ? "chevron-forward" : "chevron-back"}
+            name={language === "ar-EG" ? "chevron-forward" : "chevron-back"}
             size={28}
             color={Colors.white}
           />
@@ -93,23 +98,6 @@ export default function SettingsScreen() {
               ]}
             >
               {t("settings_language_en")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.languageOption,
-              language === "ar" && styles.languageOptionActive,
-            ]}
-            onPress={() => handleChangeLanguage("ar")}
-          >
-            <Text
-              style={[
-                styles.languageOptionText,
-                language === "ar" && styles.languageOptionTextActive,
-              ]}
-            >
-              {t("settings_language_ar")}
             </Text>
           </TouchableOpacity>
 

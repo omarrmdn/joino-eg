@@ -59,7 +59,7 @@ export function usePushNotifications() {
 
         // Get Expo push token
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '8d20b8c5-e1c1-4380-88ec-4a7706150107', // Match app.json
+            projectId: '189370cd-18a1-455a-a72a-769d33595334', // Updated project ID
         });
         const token = tokenData.data;
 
@@ -114,6 +114,8 @@ export function usePushNotifications() {
 // ── Handle notification tap → navigate ───────────────────────────────────────
 
 function handleNotificationTap(data: Record<string, unknown>) {
+    console.log('[Notification] Tapped with data:', JSON.stringify(data, null, 2));
+
     const { type, event_id, message_id, question_id } = data as {
         type?: string;
         event_id?: string;
@@ -126,6 +128,10 @@ function handleNotificationTap(data: Record<string, unknown>) {
         case 'attendee_cancel':
         case 'event_access':
         case 'new_event':
+        case 'event_canceled':
+        case 'event_update':
+        case 'recommendation':
+        case 'event_stats':
             if (event_id) {
                 router.push({ pathname: '/event-details', params: { id: event_id } });
             }
@@ -137,7 +143,16 @@ function handleNotificationTap(data: Record<string, unknown>) {
             }
             break;
 
+        case 'message':
+            if (message_id) {
+                router.push({ pathname: '/messages', params: { id: message_id } });
+            } else if (event_id) {
+                router.push({ pathname: '/messages' as any });
+            }
+            break;
+
         default:
+            console.log('[Notification] Unhandled type or message tap:', type);
             if (message_id) {
                 router.push({ pathname: '/messages', params: { id: message_id } });
             }
@@ -150,7 +165,7 @@ function handleNotificationTap(data: Record<string, unknown>) {
 export async function unregisterPushToken(supabase: any) {
     try {
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '8d20b8c5-e1c1-4380-88ec-4a7706150107',
+            projectId: '189370cd-18a1-455a-a72a-769d33595334',
         }).catch(() => null);
 
         if (!tokenData) return;

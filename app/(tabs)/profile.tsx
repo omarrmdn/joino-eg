@@ -22,7 +22,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../src/constants/Colors";
-import { PROMOTIONS_ENABLED } from "../../src/constants/FeatureFlags";
 import { Fonts } from "../../src/constants/Fonts";
 import { useTags } from "../../src/hooks/useEvents";
 import { useTrackSession } from "../../src/hooks/useTrackSession";
@@ -371,15 +370,6 @@ export default function ProfileScreen() {
             })}
           </Text>
         </Animated.View>
-        {PROMOTIONS_ENABLED && (
-          <>
-            <View style={styles.statSeparator} />
-            <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.statCard}>
-              <MaterialCommunityIcons name="advertisements" size={30} color={Colors.primary} />
-              <Text style={styles.adCenterLabel}>{t("profile_ad_center")}</Text>
-            </Animated.View>
-          </>
-        )}
       </View>
 
       {/* Interests Section */}
@@ -485,7 +475,7 @@ export default function ProfileScreen() {
         >
           <Ionicons name="settings-outline" size={24} color={Colors.white} />
           <Text style={styles.menuItemText}>{t("profile_settings")}</Text>
-          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
+          <Ionicons name={language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -494,7 +484,7 @@ export default function ProfileScreen() {
         >
           <Ionicons name="bug-outline" size={24} color={Colors.white} />
           <Text style={styles.menuItemText}>{t("profile_report_bug")}</Text>
-          <Ionicons name={language === 'ar' || language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
+          <Ionicons name={language === 'ar-EG' ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </Animated.View>
 

@@ -1120,7 +1120,7 @@ export default function AddScreen() {
           <Text style={styles.imageSizeHint}>{t("create_event_image_size_hint")}</Text>
 
           <View style={styles.form}>
-            <View style={[styles.inputContainer, fieldErrors.title && styles.inputError]}>
+            <View style={[styles.inputContainer, { borderColor: Colors.gray }, fieldErrors.title && styles.inputError]}>
               <TextInput
                 style={styles.input}
                 placeholder={t("create_event_title_placeholder")}
@@ -1131,7 +1131,7 @@ export default function AddScreen() {
             </View>
             {fieldErrors.title && <Text style={styles.fieldErrorText}>{fieldErrors.title}</Text>}
 
-            <View style={[styles.inputContainer, styles.textAreaContainer]}>
+            <View style={[styles.inputContainer, styles.textAreaContainer, { borderColor: Colors.gray }]}>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder={t("create_event_description_placeholder")}
@@ -1150,13 +1150,13 @@ export default function AddScreen() {
             <Text style={styles.label}>{t("create_event_type_label")}</Text>
             <View style={[styles.typeSelector, fieldErrors.eventType && { borderWidth: 1, borderColor: Colors.error, borderRadius: 12, padding: 4 }]}>
               <TouchableOpacity
-                style={[styles.typeButton, isOnline && styles.typeButtonActive, fieldErrors.eventType && !isOnline && styles.typeButtonError]}
+                style={[styles.typeButton, isOnline && styles.typeButtonActive]}
                 onPress={() => { setEventType("online"); if (fieldErrors.eventType) setFieldErrors(prev => { const n = {...prev}; delete n.eventType; return n; }); }}
               >
                 <Ionicons
                   name="globe-outline"
                   size={20}
-                  color={isOnline ? Colors.white : fieldErrors.eventType ? Colors.error : Colors.gray}
+                  color={isOnline ? Colors.white : Colors.gray}
                 />
                 <Text
                   style={[
@@ -1168,13 +1168,13 @@ export default function AddScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.typeButton, isOnsite && styles.typeButtonActive, fieldErrors.eventType && !isOnsite && styles.typeButtonError]}
+                style={[styles.typeButton, isOnsite && styles.typeButtonActive]}
                 onPress={() => { setEventType("onsite"); if (fieldErrors.eventType) setFieldErrors(prev => { const n = {...prev}; delete n.eventType; return n; }); }}
               >
                 <Ionicons
                   name="location-outline"
                   size={20}
-                  color={isOnsite ? Colors.white : fieldErrors.eventType ? Colors.error : Colors.gray}
+                  color={isOnsite ? Colors.white : Colors.gray}
                 />
                 <Text
                   style={[
@@ -1188,7 +1188,7 @@ export default function AddScreen() {
             </View>
             {fieldErrors.eventType && <Text style={styles.fieldErrorText}>{fieldErrors.eventType}</Text>}
 
-            <View style={[styles.inputContainer, (fieldErrors.location || fieldErrors.link) && styles.inputError]}>
+            <View style={[styles.inputContainer, { borderColor: Colors.gray }, (fieldErrors.location || fieldErrors.link) && styles.inputError]}>
               <View style={styles.locationInputRow}>
                 <TextInput
                   style={[styles.input, styles.locationInput]}
@@ -1250,7 +1250,7 @@ export default function AddScreen() {
             <Text style={styles.label}>{t("create_event_schedule_label")}</Text>
             <View style={styles.row}>
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }, fieldErrors.startDate && styles.inputError]}
+                style={[styles.inputContainer, { flex: 1, borderColor: Colors.gray }, fieldErrors.startDate && styles.inputError]}
                 onPress={() => { setDatePickerVisibility(true); if (fieldErrors.startDate) setFieldErrors(prev => { const n = {...prev}; delete n.startDate; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
@@ -1270,7 +1270,7 @@ export default function AddScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }, fieldErrors.eventTime && styles.inputError]}
+                style={[styles.inputContainer, { flex: 1, borderColor: Colors.gray }, fieldErrors.eventTime && styles.inputError]}
                 onPress={() => { setTimePickerVisibility(true); if (fieldErrors.eventTime) setFieldErrors(prev => { const n = {...prev}; delete n.eventTime; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
@@ -1297,7 +1297,7 @@ export default function AddScreen() {
             <Text style={styles.label}>{t("create_event_end_label")}</Text>
             <View style={styles.row}>
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }]}
+                style={[styles.inputContainer, { flex: 1, borderColor: Colors.gray }]}
                 onPress={() => setEndDatePickerVisibility(true)}
               >
                 <View style={styles.pickerTrigger}>
@@ -1317,7 +1317,7 @@ export default function AddScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.inputContainer, { flex: 1 }, fieldErrors.endTime && styles.inputError]}
+                style={[styles.inputContainer, { flex: 1, borderColor: Colors.gray }, fieldErrors.endTime && styles.inputError]}
                 onPress={() => { setEndTimePickerVisibility(true); if (fieldErrors.endTime) setFieldErrors(prev => { const n = {...prev}; delete n.endTime; return n; }); }}
               >
                 <View style={styles.pickerTrigger}>
@@ -1380,7 +1380,7 @@ export default function AddScreen() {
 
             <View style={styles.row}>
               <View style={[{ flex: 1 }]}>
-                <View style={[styles.inputContainer, fieldErrors.capacity && styles.inputError]}>
+                <View style={[styles.inputContainer, { borderColor: Colors.gray }, fieldErrors.capacity && styles.inputError]}>
                   <TextInput
                     style={styles.input}
                     placeholder={t("create_event_capacity")}
@@ -1396,7 +1396,7 @@ export default function AddScreen() {
                 {fieldErrors.capacity && <Text style={styles.fieldErrorText}>{fieldErrors.capacity}</Text>}
               </View>
               <View style={[{ flex: 1 }]}>
-                <View style={[styles.inputContainer, fieldErrors.cost && styles.inputError]}>
+                <View style={[styles.inputContainer, { borderColor: Colors.gray }, fieldErrors.cost && styles.inputError]}>
                   <TextInput
                     style={styles.input}
                     placeholder={t("create_event_cost")}
@@ -1657,7 +1657,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     borderWidth: 1,
-    borderColor: Colors.lightblack,
+    borderColor: Colors.gray,
     borderRadius: 12,
     backgroundColor: "transparent",
     paddingHorizontal: 15,
