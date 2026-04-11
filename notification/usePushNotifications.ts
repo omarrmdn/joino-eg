@@ -1,5 +1,6 @@
 import { useUser } from '@clerk/clerk-expo';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
@@ -59,7 +60,7 @@ export function usePushNotifications() {
 
         // Get Expo push token
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '189370cd-18a1-455a-a72a-769d33595334', // Updated project ID
+            projectId: Constants.expoConfig?.extra?.eas?.projectId,
         });
         const token = tokenData.data;
 
@@ -165,7 +166,7 @@ function handleNotificationTap(data: Record<string, unknown>) {
 export async function unregisterPushToken(supabase: any) {
     try {
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: '189370cd-18a1-455a-a72a-769d33595334',
+            projectId: Constants.expoConfig?.extra?.eas?.projectId,
         }).catch(() => null);
 
         if (!tokenData) return;

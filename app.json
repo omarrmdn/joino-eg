@@ -12,7 +12,6 @@
       "barStyle": "light-content",
       "backgroundColor": "#000000"
     },
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -23,7 +22,6 @@
         "backgroundColor": "#FF5B04",
         "foregroundImage": "./assets/logoredsharp.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -65,7 +63,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "189370cd-18a1-455a-a72a-769d33595334"
+        "projectId": "95602631-8450-4797-a8d4-72e010690145"
       }
     },
     "runtimeVersion": {
@@ -75,7 +73,7 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/189370cd-18a1-455a-a72a-769d33595334"
+      "url": "https://u.expo.dev/95602631-8450-4797-a8d4-72e010690145"
     },
     "owner": "omar3rmdn"
   }
